@@ -3,6 +3,7 @@ import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch } from 'firebase/firestore';
 import { Transaction, AccountEntry, AgendaTask, AppNote } from '../types';
 import { bankAccountService } from './bankAccountService';
+import { cleanFirestoreData } from '../lib/utils';
 
 export const financeService = {
     // --- TRANSAÇÕES (CAIXA) ---
@@ -31,7 +32,7 @@ export const financeService = {
             related_id: t.relatedId || null, 
             bank_account_id: t.bankAccountId || null
         };
-        const docRef = await addDoc(collection(db, 'transactions'), data);
+        const docRef = await addDoc(collection(db, 'transactions'), cleanFirestoreData(data));
         
         // Sync Balance
         if (t.bankAccountId) {
@@ -53,7 +54,7 @@ export const financeService = {
             related_id: t.relatedId || null, 
             bank_account_id: t.bankAccountId || null
         };
-        await updateDoc(doc(db, 'transactions', t.id), data);
+        await updateDoc(doc(db, 'transactions', t.id), cleanFirestoreData(data));
 
         // Sync Balances
         if (oldT && oldT.bank_account_id) {
@@ -112,7 +113,7 @@ export const financeService = {
             is_paid: entry.isPaid, 
             related_id: entry.relatedId || null,
         };
-        const docRef = await addDoc(collection(db, 'account_entries'), data);
+        const docRef = await addDoc(collection(db, 'account_entries'), cleanFirestoreData(data));
         return { ...entry, id: docRef.id };
     },
     deleteAccountEntry: async (id: string): Promise<void> => {
@@ -135,12 +136,12 @@ export const financeService = {
         });
     },
     addTask: async (task: Omit<AgendaTask, 'id'>): Promise<AgendaTask> => {
-        const docRef = await addDoc(collection(db, 'agenda_tasks'), task);
+        const docRef = await addDoc(collection(db, 'agenda_tasks'), cleanFirestoreData(task));
         return { ...task, id: docRef.id };
     },
     updateTask: async (task: AgendaTask): Promise<AgendaTask> => {
         const { id, ...data } = task;
-        await updateDoc(doc(db, 'agenda_tasks', id), data);
+        await updateDoc(doc(db, 'agenda_tasks', id), cleanFirestoreData(data));
         return task;
     },
     deleteTask: async (id: string): Promise<void> => {
@@ -163,12 +164,12 @@ export const financeService = {
         });
     },
     addNote: async (note: Omit<AppNote, 'id'>): Promise<AppNote> => {
-        const docRef = await addDoc(collection(db, 'app_notes'), note);
+        const docRef = await addDoc(collection(db, 'app_notes'), cleanFirestoreData(note));
         return { ...note, id: docRef.id };
     },
     updateNote: async (note: AppNote): Promise<AppNote> => {
         const { id, ...data } = note;
-        await updateDoc(doc(db, 'app_notes', id), data);
+        await updateDoc(doc(db, 'app_notes', id), cleanFirestoreData(data));
         return note;
     },
     deleteNote: async (id: string): Promise<void> => {

@@ -3,6 +3,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch } from 'firebase/firestore';
 import { AppColor, AppUnit, AppGrid, ExpenseCategory } from '../types';
+import { cleanFirestoreData } from '../lib/utils';
 
 export const configService = {
     // --- CORES ---
@@ -13,15 +14,15 @@ export const configService = {
     },
     createColor: async (color: AppColor): Promise<AppColor> => {
         if (color.id && color.id.trim()) {
-            await setDoc(doc(db, 'colors', color.id), { name: color.name });
+            await setDoc(doc(db, 'colors', color.id), cleanFirestoreData({ name: color.name }));
             return color;
         } else {
-            const docRef = await addDoc(collection(db, 'colors'), { name: color.name });
+            const docRef = await addDoc(collection(db, 'colors'), cleanFirestoreData({ name: color.name }));
             return { id: docRef.id, name: color.name };
         }
     },
     updateColor: async (color: AppColor): Promise<AppColor> => {
-        await updateDoc(doc(db, 'colors', color.id), { name: color.name });
+        await updateDoc(doc(db, 'colors', color.id), cleanFirestoreData({ name: color.name }));
         return color;
     },
     deleteColor: async (id: string): Promise<void> => {
@@ -51,15 +52,15 @@ export const configService = {
     },
     createUnit: async (unit: AppUnit): Promise<AppUnit> => {
         if (unit.id && unit.id.trim()) {
-            await setDoc(doc(db, 'units', unit.id), { name: unit.name });
+            await setDoc(doc(db, 'units', unit.id), cleanFirestoreData({ name: unit.name }));
             return unit;
         } else {
-            const docRef = await addDoc(collection(db, 'units'), { name: unit.name });
+            const docRef = await addDoc(collection(db, 'units'), cleanFirestoreData({ name: unit.name }));
             return { id: docRef.id, name: unit.name };
         }
     },
     updateUnit: async (unit: AppUnit): Promise<AppUnit> => {
-        await updateDoc(doc(db, 'units', unit.id), { name: unit.name });
+        await updateDoc(doc(db, 'units', unit.id), cleanFirestoreData({ name: unit.name }));
         return unit;
     },
     deleteUnit: async (id: string): Promise<void> => {
@@ -88,9 +89,9 @@ export const configService = {
     createGrid: async (grid: AppGrid): Promise<AppGrid> => {
         let gridId = grid.id;
         if (gridId && gridId.trim()) {
-            await setDoc(doc(db, 'grids', gridId), { name: grid.name, sizes: grid.sizes });
+            await setDoc(doc(db, 'grids', gridId), cleanFirestoreData({ name: grid.name, sizes: grid.sizes }));
         } else {
-            const docRef = await addDoc(collection(db, 'grids'), { name: grid.name, sizes: grid.sizes });
+            const docRef = await addDoc(collection(db, 'grids'), cleanFirestoreData({ name: grid.name, sizes: grid.sizes }));
             gridId = docRef.id;
         }
 
@@ -98,14 +99,14 @@ export const configService = {
             const batch = writeBatch(db);
             grid.distributions.forEach(d => {
                 const dRef = d.id ? doc(db, 'grid_distributions', d.id) : doc(collection(db, 'grid_distributions'));
-                batch.set(dRef, { grid_id: gridId, name: d.name, quantities: d.quantities });
+                batch.set(dRef, cleanFirestoreData({ grid_id: gridId, name: d.name, quantities: d.quantities }));
             });
             await batch.commit();
         }
         return { ...grid, id: gridId };
     },
     updateGrid: async (grid: AppGrid): Promise<AppGrid> => {
-        await updateDoc(doc(db, 'grids', grid.id), { name: grid.name, sizes: grid.sizes });
+        await updateDoc(doc(db, 'grids', grid.id), cleanFirestoreData({ name: grid.name, sizes: grid.sizes }));
         
         // Delete e re-insert distribuições (simulando a lógica original)
         const batch = writeBatch(db);
@@ -118,7 +119,7 @@ export const configService = {
             const insertBatch = writeBatch(db);
             grid.distributions.forEach(d => {
                 const dRef = d.id ? doc(db, 'grid_distributions', d.id) : doc(collection(db, 'grid_distributions'));
-                insertBatch.set(dRef, { grid_id: grid.id, name: d.name, quantities: d.quantities });
+                insertBatch.set(dRef, cleanFirestoreData({ grid_id: grid.id, name: d.name, quantities: d.quantities }));
             });
             await insertBatch.commit();
         }
@@ -141,11 +142,11 @@ export const configService = {
         return snapshot.docs.map(d => ({ id: d.id, name: d.data().name } as ExpenseCategory));
     },
     createExpenseCategory: async (category: Omit<ExpenseCategory, 'id'>): Promise<ExpenseCategory> => {
-        const docRef = await addDoc(collection(db, 'expense_categories'), { name: category.name });
+        const docRef = await addDoc(collection(db, 'expense_categories'), cleanFirestoreData({ name: category.name }));
         return { id: docRef.id, name: category.name };
     },
     updateExpenseCategory: async (category: ExpenseCategory): Promise<ExpenseCategory> => {
-        await updateDoc(doc(db, 'expense_categories', category.id), { name: category.name });
+        await updateDoc(doc(db, 'expense_categories', category.id), cleanFirestoreData({ name: category.name }));
         return category;
     },
     deleteExpenseCategory: async (id: string): Promise<void> => {

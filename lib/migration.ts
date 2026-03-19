@@ -22,10 +22,11 @@ export const migrateLocalDataToFirebase = async (
         // Extrai dados
         const { colors, units, grids, suppliers, customers, products, sales, purchases, transactions, financials, tasks, notes } = rawData;
 
+        const sanitize = (val: any) => (val === undefined || val === null) ? null : val;
+
         const executeBatch = async (items: any[], collectionName: string, transform: (item: any) => any) => {
             if (!items || items.length === 0) return;
             
-            // Firestore matches are limited to 500 operations
             for (let i = 0; i < items.length; i += 500) {
                 const batch = writeBatch(db);
                 const chunk = items.slice(i, i + 500);
@@ -33,8 +34,15 @@ export const migrateLocalDataToFirebase = async (
                 chunk.forEach(item => {
                     const data = transform(item);
                     if (data && data.id) {
+                        // Limpeza profunda para remover undefined
+                        const cleanData: any = {};
+                        Object.entries(data).forEach(([k, v]) => {
+                            if (v !== undefined) cleanData[k] = v;
+                            else cleanData[k] = null;
+                        });
+
                         const ref = doc(db, collectionName, data.id);
-                        batch.set(ref, data);
+                        batch.set(ref, cleanData);
                     }
                 });
                 

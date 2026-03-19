@@ -2,6 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
 import { FamilyMember, PersonalCategory, PersonalBudget, PersonalTransaction } from '../types';
+import { cleanFirestoreData } from '../lib/utils';
 
 export const personalFinanceService = {
     // --- Family Members ---
@@ -12,13 +13,13 @@ export const personalFinanceService = {
     },
 
     createFamilyMember: async (member: Omit<FamilyMember, 'id'>): Promise<FamilyMember> => {
-        const docRef = await addDoc(collection(db, 'family_members'), member);
+        const docRef = await addDoc(collection(db, 'family_members'), cleanFirestoreData(member));
         return { id: docRef.id, ...member } as FamilyMember;
     },
 
     updateFamilyMember: async (member: FamilyMember): Promise<FamilyMember> => {
         const { id, ...data } = member;
-        await updateDoc(doc(db, 'family_members', id), data);
+        await updateDoc(doc(db, 'family_members', id), cleanFirestoreData(data));
         return member;
     },
 
@@ -36,7 +37,7 @@ export const personalFinanceService = {
                 id: d.id,
                 name: data.name,
                 type: data.type,
-                parentId: data.parent_id
+                parentId: data.parent_id || undefined
             };
         });
     },
@@ -47,12 +48,12 @@ export const personalFinanceService = {
             type: category.type,
             parent_id: category.parentId || null
         };
-        const docRef = await addDoc(collection(db, 'personal_categories'), data);
+        const docRef = await addDoc(collection(db, 'personal_categories'), cleanFirestoreData(data));
         return {
             id: docRef.id,
             name: data.name,
             type: data.type,
-            parentId: data.parent_id
+            parentId: data.parent_id || undefined
         };
     },
 
@@ -62,12 +63,12 @@ export const personalFinanceService = {
             type: category.type,
             parent_id: category.parentId || null
         };
-        await updateDoc(doc(db, 'personal_categories', category.id), data);
+        await updateDoc(doc(db, 'personal_categories', category.id), cleanFirestoreData(data));
         return {
             id: category.id,
             name: data.name,
             type: data.type,
-            parentId: data.parent_id
+            parentId: data.parent_id || undefined
         };
     },
 
@@ -97,11 +98,11 @@ export const personalFinanceService = {
             amount: budget.amount,
             month: budget.month
         };
-        const docRef = await addDoc(collection(db, 'personal_budgets'), data);
+        const docRef = await addDoc(collection(db, 'personal_budgets'), cleanFirestoreData(data));
         return {
             id: docRef.id,
             categoryId: data.category_id,
-            memberId: data.member_id,
+            memberId: data.member_id || undefined,
             amount: data.amount,
             month: data.month
         };
@@ -114,11 +115,11 @@ export const personalFinanceService = {
             amount: budget.amount,
             month: budget.month
         };
-        await updateDoc(doc(db, 'personal_budgets', budget.id), data);
+        await updateDoc(doc(db, 'personal_budgets', budget.id), cleanFirestoreData(data));
         return {
             id: budget.id,
             categoryId: data.category_id,
-            memberId: data.member_id,
+            memberId: data.member_id || undefined,
             amount: data.amount,
             month: data.month
         };
@@ -140,12 +141,12 @@ export const personalFinanceService = {
                 type: t.type,
                 amount: t.amount,
                 description: t.description,
-                categoryId: t.category_id,
-                memberId: t.member_id,
+                categoryId: t.category_id || undefined,
+                memberId: t.member_id || undefined,
                 isPaid: t.is_paid,
-                businessTransactionId: t.business_transaction_id,
-                paymentMethod: t.payment_method,
-                bank_account_id: t.bank_account_id
+                businessTransactionId: t.business_transaction_id || undefined,
+                paymentMethod: t.payment_method || undefined,
+                bank_account_id: t.bank_account_id || undefined
             };
         });
     },
@@ -163,19 +164,19 @@ export const personalFinanceService = {
             payment_method: t.paymentMethod || null,
             bank_account_id: t.bank_account_id || null
         };
-        const docRef = await addDoc(collection(db, 'personal_transactions'), data);
+        const docRef = await addDoc(collection(db, 'personal_transactions'), cleanFirestoreData(data));
         return {
             id: docRef.id,
             date: data.date,
             type: data.type,
             amount: data.amount,
             description: data.description,
-            categoryId: data.category_id,
-            memberId: data.member_id,
+            categoryId: data.category_id || undefined,
+            memberId: data.member_id || undefined,
             isPaid: data.is_paid,
-            businessTransactionId: data.business_transaction_id,
-            paymentMethod: data.payment_method,
-            bank_account_id: data.bank_account_id
+            businessTransactionId: data.business_transaction_id || undefined,
+            paymentMethod: data.payment_method || undefined,
+            bank_account_id: data.bank_account_id || undefined
         };
     },
 
@@ -192,19 +193,19 @@ export const personalFinanceService = {
             payment_method: t.paymentMethod || null,
             bank_account_id: t.bank_account_id || null
         };
-        await updateDoc(doc(db, 'personal_transactions', t.id), data);
+        await updateDoc(doc(db, 'personal_transactions', t.id), cleanFirestoreData(data));
         return {
             id: t.id,
             date: data.date,
             type: data.type,
             amount: data.amount,
             description: data.description,
-            categoryId: data.category_id,
-            memberId: data.member_id,
+            categoryId: data.category_id || undefined,
+            memberId: data.member_id || undefined,
             isPaid: data.is_paid,
-            businessTransactionId: data.business_transaction_id,
-            paymentMethod: data.payment_method,
-            bank_account_id: data.bank_account_id
+            businessTransactionId: data.business_transaction_id || undefined,
+            paymentMethod: data.payment_method || undefined,
+            bank_account_id: data.bank_account_id || undefined
         };
     },
 

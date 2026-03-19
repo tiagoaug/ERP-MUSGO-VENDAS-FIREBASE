@@ -2,7 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch, limit } from 'firebase/firestore';
 import { Product, Variation, WholesaleStockItem } from '../types';
-import { generateId } from '../lib/utils';
+import { generateId, cleanFirestoreData } from '../lib/utils';
 
 // Helper: monta um produto completo buscando variações e estoque atacado
 const buildProduct = (rawProduct: any, rawProductId: string, variations: any[], wholesaleStock: any[]): Product => ({
@@ -25,9 +25,6 @@ const buildProduct = (rawProduct: any, rawProductId: string, variations: any[], 
             stock: v.stock,
             minStock: v.min_stock,
             costPrice: v.cost_price,
-            sale_price: v.sale_price, // Note: original used sale_price in buildProduct but salePrice in type? wait.
-            // Let's check types.ts if possible, but original code had sale_price in the map.
-            // Actually original code line 27: salePrice: v.sale_price
             salePrice: v.sale_price,
             unit: v.unit,
             image: v.image,
@@ -76,87 +73,92 @@ export const productService = {
         return buildProduct(productDoc.data(), productDoc.id, variations, wholesaleStock);
     },
 
-    createProduct: async (product: Product): Promise<Product> => {
-        const productToInsert: any = {
-            reference: product.reference,
-            name: product.name,
-            supplier_id: product.supplierId,
-            grid_id: product.gridId || null,
-            grid_ids: product.gridIds || [],
-            status: product.status,
-            image: product.image || null,
-            has_retail: product.hasRetail,
-            has_wholesale: product.hasWholesale,
-        };
+    createProduct: async (p: Product): Promise<Product> => {
+        const productToInsert = cleanFirestoreData({
+            reference: String(p.reference || ''),
+            name: String(p.name || p.reference || ''),
+            supplier_id: p.supplierId || null,
+            grid_id: p.gridId || null,
+            grid_ids: p.gridIds || [],
+            status: p.status || 'active',
+            image: p.image || null,
+            has_retail: !!p.hasRetail,
+            has_wholesale: !!p.hasWholesale,
+            created_at: new Date().toISOString()
+        });
 
         const batch = writeBatch(db);
-        let productId = product.id;
+        let productId = p.id;
         let productRef;
 
         if (productId && productId.trim()) {
             productRef = doc(db, 'products', productId);
+            console.log(`[Firestore Write] Setting product ${productId}:`, productToInsert);
             batch.set(productRef, productToInsert);
         } else {
             productRef = doc(collection(db, 'products'));
             productId = productRef.id;
+            console.log(`[Firestore Write] Creating product ${productId}:`, productToInsert);
             batch.set(productRef, productToInsert);
         }
 
-        if (product.variations?.length) {
-            product.variations.forEach(v => {
+        if (p.variations?.length) {
+            p.variations.forEach(v => {
                 const vRef = v.id ? doc(db, 'variations', v.id) : doc(collection(db, 'variations'));
-                batch.set(vRef, {
+                batch.set(vRef, cleanFirestoreData({
                     product_id: productId,
-                    color_id: v.colorId,
-                    size: v.size,
-                    stock: v.stock,
-                    min_stock: v.minStock,
-                    cost_price: v.costPrice,
-                    sale_price: v.salePrice,
-                    unit: v.unit,
+                    color_id: v.colorId || null,
+                    size: String(v.size || ''),
+                    stock: Number(v.stock || 0),
+                    min_stock: Number(v.minStock || 0),
+                    cost_price: Number(v.costPrice || 0),
+                    sale_price: Number(v.salePrice || 0),
+                    unit: String(v.unit || ''),
                     image: v.image || null,
                     grid_id: v.gridId || null,
-                });
+                }));
             });
         }
 
-        if (product.wholesaleStock?.length) {
-            product.wholesaleStock.forEach(ws => {
+        if (p.wholesaleStock?.length) {
+            p.wholesaleStock.forEach(ws => {
                 const wsRef = ws.id ? doc(db, 'wholesale_stock_items', ws.id) : doc(collection(db, 'wholesale_stock_items'));
-                batch.set(wsRef, {
+                batch.set(wsRef, cleanFirestoreData({
                     product_id: productId,
-                    color_id: ws.colorId,
-                    grid_id: ws.gridId,
-                    distribution_id: ws.distributionId,
-                    boxes: ws.boxes,
-                    cost_price_per_box: ws.costPricePerBox,
-                    sale_price_per_box: ws.salePricePerBox,
+                    color_id: ws.colorId || null,
+                    grid_id: ws.gridId || null,
+                    distribution_id: ws.distributionId || null,
+                    boxes: Number(ws.boxes || 0),
+                    cost_price_per_box: Number(ws.costPricePerBox || 0),
+                    sale_price_per_box: Number(ws.salePricePerBox || 0),
                     image: ws.image || null,
-                });
+                }));
             });
         }
 
         await batch.commit();
-        return { ...product, id: productId };
+        return { ...p, id: productId };
     },
 
     updateProduct: async (product: Product): Promise<Product> => {
-        console.log("💾 Iniciando salvamento do produto:", product.reference, product.id);
-
         const batch = writeBatch(db);
         const productRef = doc(db, 'products', product.id);
         
-        batch.update(productRef, {
-            reference: product.reference,
-            name: product.name,
-            supplier_id: product.supplierId,
+        const cleanedProduct = cleanFirestoreData({
+            reference: String(product.reference || ''),
+            name: String(product.name || product.reference || ''),
+            supplier_id: product.supplierId || null,
             grid_id: product.gridId || null,
             grid_ids: product.gridIds || [],
-            status: product.status,
+            status: product.status || 'active',
             image: product.image || null,
-            has_retail: product.hasRetail,
-            has_wholesale: product.hasWholesale,
+            has_retail: !!product.hasRetail,
+            has_wholesale: !!product.hasWholesale,
+            updated_at: new Date().toISOString()
         });
+
+        console.log(`[Firestore Write] Updating product ${product.id}:`, cleanedProduct);
+        batch.update(productRef, cleanedProduct);
 
         // 1. Variações Varejo
         try {
@@ -171,18 +173,18 @@ export const productService = {
                 product.variations.forEach(v => {
                     const id = v.id || generateId();
                     const vRef = doc(db, 'variations', id);
-                    batch.set(vRef, {
+                    batch.set(vRef, cleanFirestoreData({
                         product_id: product.id,
-                        color_id: v.colorId,
-                        size: v.size,
-                        stock: v.stock,
-                        min_stock: v.minStock,
-                        cost_price: v.costPrice,
-                        sale_price: v.salePrice,
-                        unit: v.unit,
+                        color_id: v.colorId || null,
+                        size: v.size || '',
+                        stock: v.stock || 0,
+                        min_stock: v.minStock || 0,
+                        cost_price: v.costPrice || 0,
+                        sale_price: v.salePrice || 0,
+                        unit: v.unit || '',
                         image: v.image || null,
                         grid_id: v.gridId || null
-                    });
+                    }));
                 });
             }
         } catch (err: any) {
@@ -215,16 +217,16 @@ export const productService = {
                     const id = ws.id || generateId();
                     const wsRef = doc(db, 'wholesale_stock_items', id);
                     
-                    const wsData = {
+                    const wsData = cleanFirestoreData({
                         product_id: product.id,
-                        color_id: ws.colorId,
-                        grid_id: ws.gridId,
-                        distribution_id: ws.distributionId,
-                        boxes: ws.boxes,
-                        cost_price_per_box: ws.costPricePerBox,
-                        sale_price_per_box: ws.salePricePerBox,
+                        color_id: ws.colorId || null,
+                        grid_id: ws.gridId || null,
+                        distribution_id: ws.distributionId || null,
+                        boxes: ws.boxes || 0,
+                        cost_price_per_box: ws.costPricePerBox || 0,
+                        sale_price_per_box: ws.salePricePerBox || 0,
                         image: ws.image || null,
-                    };
+                    });
 
                     batch.set(wsRef, wsData);
 
@@ -243,18 +245,19 @@ export const productService = {
                                         if (ws.salePricePerBox > 0) v.salePrice = unitSale;
                                         // Update in batch as well
                                         const vId = v.id || generateId();
-                                        batch.set(doc(db, 'variations', vId), {
+                                        const vData = cleanFirestoreData({
                                             product_id: product.id,
-                                            color_id: v.colorId,
-                                            size: v.size,
-                                            stock: v.stock,
-                                            min_stock: v.minStock,
-                                            cost_price: v.costPrice,
-                                            sale_price: v.salePrice,
-                                            unit: v.unit,
+                                            color_id: v.colorId || null,
+                                            size: String(v.size || ''),
+                                            stock: Number(v.stock || 0),
+                                            min_stock: Number(v.minStock || 0),
+                                            cost_price: Number(v.costPrice || 0),
+                                            sale_price: Number(v.salePrice || 0),
+                                            unit: String(v.unit || ''),
                                             image: v.image || null,
                                             grid_id: v.gridId || null
                                         });
+                                        batch.set(doc(db, 'variations', vId), vData);
                                     }
                                 });
                             }

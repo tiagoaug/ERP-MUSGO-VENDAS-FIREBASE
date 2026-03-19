@@ -2,6 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
 import { Supplier } from '../types';
+import { cleanFirestoreData } from '../lib/utils';
 
 const fromRow = (id: string, s: any): Supplier => ({
     id: id,
@@ -31,10 +32,10 @@ export const supplierService = {
         };
 
         if (supplier.id && supplier.id.trim()) {
-            await setDoc(doc(db, 'suppliers', supplier.id), data);
+            await setDoc(doc(db, 'suppliers', supplier.id), cleanFirestoreData(data));
             return { ...supplier };
         } else {
-            const docRef = await addDoc(collection(db, 'suppliers'), data);
+            const docRef = await addDoc(collection(db, 'suppliers'), cleanFirestoreData(data));
             return fromRow(docRef.id, data);
         }
     },
@@ -48,7 +49,7 @@ export const supplierService = {
             phone: supplier.phone,
             email: supplier.email,
         };
-        await updateDoc(doc(db, 'suppliers', supplier.id), data);
+        await updateDoc(doc(db, 'suppliers', supplier.id), cleanFirestoreData(data));
         return supplier;
     },
 

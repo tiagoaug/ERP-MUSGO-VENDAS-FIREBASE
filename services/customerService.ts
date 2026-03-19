@@ -2,6 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
 import { Customer } from '../types';
+import { cleanFirestoreData } from '../lib/utils';
 
 const fromRow = (id: string, c: any): Customer => ({
     id: id,
@@ -27,10 +28,10 @@ export const customerService = {
         };
 
         if (customer.id && customer.id.trim()) {
-            await setDoc(doc(db, 'customers', customer.id), data);
+            await setDoc(doc(db, 'customers', customer.id), cleanFirestoreData(data));
             return { ...customer };
         } else {
-            const docRef = await addDoc(collection(db, 'customers'), data);
+            const docRef = await addDoc(collection(db, 'customers'), cleanFirestoreData(data));
             return fromRow(docRef.id, data);
         }
     },
@@ -42,7 +43,7 @@ export const customerService = {
             balance: customer.balance ?? 0,
             address: customer.address,
         };
-        await updateDoc(doc(db, 'customers', customer.id), data);
+        await updateDoc(doc(db, 'customers', customer.id), cleanFirestoreData(data));
         return customer;
     },
 

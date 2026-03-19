@@ -2,6 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, increment, writeBatch } from 'firebase/firestore';
 import { BankAccount, AccountTransfer } from '../types';
+import { cleanFirestoreData } from '../lib/utils';
 
 export const bankAccountService = {
     async getAccounts(): Promise<BankAccount[]> {
@@ -11,12 +12,12 @@ export const bankAccountService = {
     },
 
     async createAccount(name: string, initialBalance: number = 0): Promise<BankAccount> {
-        const docRef = await addDoc(collection(db, 'bank_accounts'), { name, balance: initialBalance });
+        const docRef = await addDoc(collection(db, 'bank_accounts'), cleanFirestoreData({ name, balance: initialBalance }));
         return { id: docRef.id, name, balance: initialBalance };
     },
 
     async updateAccount(id: string, updates: Partial<BankAccount>): Promise<BankAccount> {
-        await updateDoc(doc(db, 'bank_accounts', id), updates);
+        await updateDoc(doc(db, 'bank_accounts', id), cleanFirestoreData(updates));
         const updatedDoc = await getDoc(doc(db, 'bank_accounts', id));
         return { id: updatedDoc.id, ...updatedDoc.data() } as BankAccount;
     },
@@ -31,14 +32,14 @@ export const bankAccountService = {
         // 1. Create transfer record
         const transferRef = doc(collection(db, 'account_transfers'));
         const transferData = {
-            date: transfer.date,
+            date: transfer.date || new Date().toISOString(),
             from_account_id: transfer.fromAccountId || null,
             to_account_id: transfer.toAccountId || null,
-            amount: transfer.amount,
-            description: transfer.description,
+            amount: transfer.amount || 0,
+            description: transfer.description || '',
             created_at: new Date().toISOString()
         };
-        batch.set(transferRef, transferData);
+        batch.set(transferRef, cleanFirestoreData(transferData));
 
         // 2. Update 'from' account balance
         if (transfer.fromAccountId) {
@@ -57,8 +58,8 @@ export const bankAccountService = {
         return {
             id: transferRef.id,
             date: transferData.date,
-            fromAccountId: transferData.from_account_id,
-            toAccountId: transferData.to_account_id,
+            fromAccountId: transferData.from_account_id || undefined,
+            toAccountId: transferData.to_account_id || undefined,
             amount: transferData.amount,
             description: transferData.description,
             created_at: transferData.created_at
@@ -66,7 +67,7 @@ export const bankAccountService = {
     },
 
     async adjustBalance(accountId: string, newBalance: number): Promise<BankAccount> {
-        await updateDoc(doc(db, 'bank_accounts', accountId), { balance: newBalance });
+        await updateDoc(doc(db, 'bank_accounts', accountId), cleanFirestoreData({ balance: newBalance }));
         const updatedDoc = await getDoc(doc(db, 'bank_accounts', accountId));
         return { id: updatedDoc.id, ...updatedDoc.data() } as BankAccount;
     },

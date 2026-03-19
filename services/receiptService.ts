@@ -2,7 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch, increment } from 'firebase/firestore';
 import { Receipt, ReceiptItem, ExpenseItem, PaymentRecord } from '../types';
-import { generateId, sanitizeBankAccountId } from '../lib/utils';
+import { generateId, sanitizeBankAccountId, cleanFirestoreData } from '../lib/utils';
 import { bankAccountService } from './bankAccountService';
 
 const buildReceipt = (row: any, id: string, items: any[], expenseItems: any[], paymentHistory: any[]): Receipt => ({
@@ -59,61 +59,61 @@ export const receiptService = {
         const receiptRef = doc(collection(db, 'receipts'));
         const receiptId = receiptRef.id;
 
-        batch.set(receiptRef, {
-            receipt_number: receipt.receiptNumber,
-            type: receipt.type,
-            is_wholesale: receipt.isWholesale,
-            customer_id: receipt.customerId,
-            date: receipt.date,
-            due_date: receipt.dueDate || receipt.date,
-            total_value: receipt.totalValue,
-            amount_paid: receipt.isPaid ? receipt.totalValue : 0,
-            is_paid: receipt.isPaid,
-            item_description: receipt.itemDescription,
-            notes: receipt.notes,
+        batch.set(receiptRef, cleanFirestoreData({
+            receipt_number: receipt.receiptNumber || '',
+            type: receipt.type || 'general',
+            is_wholesale: !!receipt.isWholesale,
+            customer_id: receipt.customerId || null,
+            date: receipt.date || new Date().toISOString(),
+            due_date: receipt.dueDate || receipt.date || new Date().toISOString(),
+            total_value: receipt.totalValue || 0,
+            amount_paid: receipt.isPaid ? (receipt.totalValue || 0) : 0,
+            is_paid: !!receipt.isPaid,
+            item_description: receipt.itemDescription || null,
+            notes: receipt.notes || null,
             accounted: receipt.accounted ?? true,
             bank_account_id: sanitizeBankAccountId(receipt.bankAccountId) || null,
-        });
+        }));
 
         if (receipt.items?.length) {
             receipt.items.forEach(i => {
                 const iRef = doc(collection(db, 'receipt_items'));
-                batch.set(iRef, {
+                batch.set(iRef, cleanFirestoreData({
                     receipt_id: receiptId,
-                    product_id: i.productId,
+                    product_id: i.productId || null,
                     variation_id: i.variationId || null,
                     distribution_id: i.distributionId || null,
-                    is_wholesale: i.isWholesale,
+                    is_wholesale: !!i.isWholesale,
                     color_id: i.colorId || null,
-                    quantity: i.quantity,
-                    cost_price: i.costPrice,
+                    quantity: i.quantity || 0,
+                    cost_price: i.costPrice || 0,
                     notes: i.notes || null,
-                });
+                }));
             });
         }
 
         if (receipt.expenseItems?.length) {
             receipt.expenseItems.forEach(e => {
                 const eRef = doc(collection(db, 'receipt_expense_items'));
-                batch.set(eRef, {
+                batch.set(eRef, cleanFirestoreData({
                     receipt_id: receiptId,
-                    description: e.description,
-                    value: e.value,
+                    description: e.description || '',
+                    value: e.value || 0,
                     notes: e.notes || null,
-                });
+                }));
             });
         }
 
         if (receipt.isPaid && (receipt.accounted ?? true)) {
             const tRef = doc(collection(db, 'transactions'));
-            batch.set(tRef, {
-                date: receipt.date,
+            batch.set(tRef, cleanFirestoreData({
+                date: receipt.date || new Date().toISOString(),
                 type: 'payment',
-                amount: receipt.totalValue,
-                description: `Recebimento ${receipt.receiptNumber}`,
+                amount: receipt.totalValue || 0,
+                description: `Recebimento ${receipt.receiptNumber || ''}`,
                 related_id: receiptId,
                 bank_account_id: sanitizeBankAccountId(receipt.bankAccountId) || null
-            });
+            }));
         }
 
         await batch.commit();
@@ -126,7 +126,7 @@ export const receiptService = {
     },
 
     updateReceipt: async (receipt: Receipt): Promise<Receipt> => {
-        await updateDoc(doc(db, 'receipts', receipt.id), {
+        await updateDoc(doc(db, 'receipts', receipt.id), cleanFirestoreData({
             receipt_number: receipt.receiptNumber,
             type: receipt.type,
             is_wholesale: receipt.isWholesale,
@@ -140,7 +140,7 @@ export const receiptService = {
             notes: receipt.notes,
             accounted: receipt.accounted ?? true,
             bank_account_id: sanitizeBankAccountId(receipt.bankAccountId) || null,
-        });
+        }));
         return receipt;
     },
 
@@ -193,23 +193,23 @@ export const receiptService = {
         batch.update(receiptRef, { amount_paid: newPaid, is_paid: isPaid });
 
         const payRef = doc(collection(db, 'payment_records'));
-        batch.set(payRef, {
+        batch.set(payRef, cleanFirestoreData({
             receipt_id: receiptId,
-            date,
-            amount,
+            date: date || new Date().toISOString(),
+            amount: amount || 0,
             note: note || 'Recebimento Parcial'
-        });
+        }));
 
         if (accounted) {
             const tRef = doc(collection(db, 'transactions'));
-            batch.set(tRef, {
-                date,
+            batch.set(tRef, cleanFirestoreData({
+                date: date || new Date().toISOString(),
                 type: 'payment',
-                amount: amount,
-                description: `Recebimento ${receipt.receipt_number}`,
+                amount: amount || 0,
+                description: `Recebimento ${receipt.receipt_number || ''}`,
                 related_id: receiptId,
                 bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-            });
+            }));
         }
 
         await batch.commit();
@@ -268,8 +268,8 @@ export const receiptService = {
         const newPaid = (receipt.amount_paid || 0) + diff;
 
         const batch = writeBatch(db);
-        batch.update(receiptRef, { amount_paid: newPaid, is_paid: newPaid >= receipt.total_value });
-        batch.update(payRef, { amount, date });
+        batch.update(receiptRef, cleanFirestoreData({ amount_paid: newPaid, is_paid: newPaid >= receipt.total_value }));
+        batch.update(payRef, cleanFirestoreData({ amount, date }));
 
         if (accounted) {
             const transQuery = query(collection(db, 'transactions'), 
@@ -279,21 +279,21 @@ export const receiptService = {
             const transSnap = await getDocs(transQuery);
 
             if (!transSnap.empty) {
-                batch.update(transSnap.docs[0].ref, {
+                batch.update(transSnap.docs[0].ref, cleanFirestoreData({
                     amount,
                     date,
                     bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-                });
+                }));
             } else {
                 const tRef = doc(collection(db, 'transactions'));
-                batch.set(tRef, {
-                    date,
+                batch.set(tRef, cleanFirestoreData({
+                    date: date || new Date().toISOString(),
                     type: 'payment',
-                    amount,
+                    amount: amount || 0,
                     description: `Recebimento ${receipt.receipt_number || 'Editado'}`,
                     related_id: receiptId,
                     bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-                });
+                }));
             }
         }
 

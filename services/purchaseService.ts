@@ -2,7 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch, increment } from 'firebase/firestore';
 import { Purchase, PurchaseItem, ExpenseItem, PaymentRecord, Cheque } from '../types';
-import { generateId, sanitizeBankAccountId } from '../lib/utils';
+import { generateId, sanitizeBankAccountId, cleanFirestoreData } from '../lib/utils';
 import { bankAccountService } from './bankAccountService';
 
 const buildPurchase = (row: any, id: string, items: any[], expenseItems: any[], paymentHistory: any[], cheques: any[]): Purchase => ({
@@ -71,76 +71,76 @@ export const purchaseService = {
         const purchaseRef = doc(collection(db, 'purchases'));
         const purchaseId = purchaseRef.id;
 
-        batch.set(purchaseRef, {
-            purchase_number: purchase.purchaseNumber,
-            type: purchase.type,
-            is_wholesale: purchase.isWholesale,
-            supplier_id: purchase.supplierId,
-            date: purchase.date,
-            due_date: purchase.dueDate || purchase.date,
-            total_value: purchase.totalValue,
-            amount_paid: purchase.isPaid ? purchase.totalValue : 0,
-            is_paid: purchase.isPaid,
-            notes: purchase.notes,
+        batch.set(purchaseRef, cleanFirestoreData({
+            purchase_number: purchase.purchaseNumber || '',
+            type: purchase.type || 'general',
+            is_wholesale: !!purchase.isWholesale,
+            supplier_id: purchase.supplierId || null,
+            date: purchase.date || new Date().toISOString(),
+            due_date: purchase.dueDate || purchase.date || new Date().toISOString(),
+            total_value: purchase.totalValue || 0,
+            amount_paid: purchase.isPaid ? (purchase.totalValue || 0) : 0,
+            is_paid: !!purchase.isPaid,
+            notes: purchase.notes || null,
             category_id: purchase.categoryId || null,
             accounted: purchase.accounted ?? true,
             bank_account_id: sanitizeBankAccountId(purchase.bankAccountId) || null
-        });
+        }));
 
         if (purchase.items?.length) {
             purchase.items.forEach(i => {
                 const iRef = doc(collection(db, 'purchase_items'));
-                batch.set(iRef, {
+                batch.set(iRef, cleanFirestoreData({
                     purchase_id: purchaseId,
-                    product_id: i.productId,
+                    product_id: i.productId || null,
                     variation_id: i.variationId || null,
                     distribution_id: i.distributionId || null,
-                    is_wholesale: i.isWholesale,
+                    is_wholesale: !!i.isWholesale,
                     color_id: i.colorId || null,
-                    quantity: i.quantity,
-                    cost_price: i.costPrice,
+                    quantity: i.quantity || 0,
+                    cost_price: i.costPrice || 0,
                     notes: i.notes || null,
-                });
+                }));
             });
         }
 
         if (purchase.expenseItems?.length) {
             purchase.expenseItems.forEach(e => {
                 const eRef = doc(collection(db, 'expense_items'));
-                batch.set(eRef, {
+                batch.set(eRef, cleanFirestoreData({
                     purchase_id: purchaseId,
-                    description: e.description,
-                    value: e.value,
+                    description: e.description || '',
+                    value: e.value || 0,
                     notes: e.notes || null
-                });
+                }));
             });
         }
 
         if (purchase.cheques?.length) {
             purchase.cheques.forEach(c => {
                 const cRef = doc(collection(db, 'cheques'));
-                batch.set(cRef, {
+                batch.set(cRef, cleanFirestoreData({
                     purchase_id: purchaseId,
-                    supplier_id: purchase.supplierId,
-                    number: c.number,
-                    amount: c.amount,
-                    due_date: c.dueDate,
-                    is_paid: false,
-                    created_at: new Date().toISOString()
-                });
+                    supplier_id: purchase.supplierId || null,
+                    number: c.number || '',
+                    amount: c.amount || 0,
+                    due_date: c.dueDate || new Date().toISOString(),
+                    is_paid: !!c.isPaid,
+                    created_at: c.created_at || new Date().toISOString()
+                }));
             });
         }
 
         if (purchase.isPaid && (purchase.accounted ?? true)) {
             const tRef = doc(collection(db, 'transactions'));
-            batch.set(tRef, {
-                date: purchase.date, 
+            batch.set(tRef, cleanFirestoreData({
+                date: purchase.date || new Date().toISOString(), 
                 type: 'expense_payment',
-                amount: -purchase.totalValue, 
-                description: `Pagamento Despesa ${purchase.purchaseNumber}`,
+                amount: -(purchase.totalValue || 0), 
+                description: `Pagamento Despesa ${purchase.purchaseNumber || ''}`,
                 related_id: purchaseId,
                 bank_account_id: sanitizeBankAccountId(purchase.bankAccountId) || null
-            });
+            }));
 
             // Note: Balance sync is done via separate bankAccountService.syncBalance call because FieldValue.increment is needed
         }
@@ -173,7 +173,7 @@ export const purchaseService = {
                         const distDoc = await getDoc(doc(db, 'grid_distributions', item.distributionId));
                         const gridIdFromDist = distDoc.exists() ? distDoc.data().grid_id : null;
 
-                        await addDoc(collection(db, 'wholesale_stock_items'), {
+                        await addDoc(collection(db, 'wholesale_stock_items'), cleanFirestoreData({
                             product_id: item.productId,
                             color_id: item.colorId || null,
                             grid_id: gridIdFromDist,
@@ -181,7 +181,7 @@ export const purchaseService = {
                             boxes: item.quantity,
                             cost_price_per_box: item.costPrice,
                             sale_price_per_box: item.costPrice * 2,
-                        });
+                        }));
                     }
 
                     // Preço unitário sync
@@ -213,7 +213,7 @@ export const purchaseService = {
     },
 
     updatePurchase: async (purchase: Purchase): Promise<Purchase> => {
-        await updateDoc(doc(db, 'purchases', purchase.id), {
+        await updateDoc(doc(db, 'purchases', purchase.id), cleanFirestoreData({
             purchase_number: purchase.purchaseNumber,
             type: purchase.type,
             is_wholesale: purchase.isWholesale,
@@ -225,7 +225,7 @@ export const purchaseService = {
             is_paid: purchase.isPaid,
             notes: purchase.notes,
             category_id: purchase.categoryId || null
-        });
+        }));
 
         if (purchase.type === 'general') {
             const expSnap = await getDocs(query(collection(db, 'expense_items'), where('purchase_id', '==', purchase.id)));
@@ -235,11 +235,11 @@ export const purchaseService = {
             if (purchase.expenseItems?.length) {
                 purchase.expenseItems.forEach(e => {
                     const eRef = doc(collection(db, 'expense_items'));
-                    batch.set(eRef, {
+                    batch.set(eRef, cleanFirestoreData({
                         purchase_id: purchase.id,
-                        description: e.description,
-                        value: e.value,
-                    });
+                        description: e.description || '',
+                        value: e.value || 0,
+                    }));
                 });
             }
             await batch.commit();
@@ -283,24 +283,24 @@ export const purchaseService = {
         const newPaid = (purchase.amount_paid || 0) + amount;
         const isPaid = newPaid >= purchase.total_value;
 
-        await updateDoc(doc(db, 'purchases', purchaseId), { amount_paid: newPaid, is_paid: isPaid });
+        await updateDoc(doc(db, 'purchases', purchaseId), cleanFirestoreData({ amount_paid: newPaid, is_paid: isPaid }));
 
-        await addDoc(collection(db, 'payment_records'), {
+        await addDoc(collection(db, 'payment_records'), cleanFirestoreData({
             purchase_id: purchaseId,
             date,
             amount,
             note: 'Pagamento Parcial'
-        });
+        }));
 
         if (accounted) {
-            await addDoc(collection(db, 'transactions'), {
+            await addDoc(collection(db, 'transactions'), cleanFirestoreData({
                 date,
                 type: 'expense_payment',
                 amount: -amount,
                 description: `Pagamento Compra ${purchase.purchase_number}`,
                 related_id: purchaseId,
                 bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-            });
+            }));
 
             if (finalBankAccountId) {
                 await bankAccountService.syncBalance(finalBankAccountId, -amount);
@@ -353,8 +353,8 @@ export const purchaseService = {
         const newAmountPaid = (purchase.amount_paid || 0) + diff;
         const isPaid = newAmountPaid >= purchase.total_value;
 
-        await updateDoc(doc(db, 'purchases', purchaseId), { amount_paid: newAmountPaid, is_paid: isPaid });
-        await updateDoc(doc(db, 'payment_records', paymentId), { amount: newAmount, date: newDate });
+        await updateDoc(doc(db, 'purchases', purchaseId), cleanFirestoreData({ amount_paid: newAmountPaid, is_paid: isPaid }));
+        await updateDoc(doc(db, 'payment_records', paymentId), cleanFirestoreData({ amount: newAmount, date: newDate }));
 
         if (accounted) {
             const transQuery = query(collection(db, 'transactions'), 
@@ -364,20 +364,20 @@ export const purchaseService = {
             const transSnap = await getDocs(transQuery);
 
             if (!transSnap.empty) {
-                await updateDoc(transSnap.docs[0].ref, {
+                await updateDoc(transSnap.docs[0].ref, cleanFirestoreData({
                     amount: -newAmount,
                     date: newDate,
                     bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-                });
+                }));
             } else {
-                await addDoc(collection(db, 'transactions'), {
+                await addDoc(collection(db, 'transactions'), cleanFirestoreData({
                     date: newDate,
                     type: 'expense_payment',
                     amount: -newAmount,
                     description: `Pagamento Compra ${purchase.purchase_number || 'Editada'}`,
                     related_id: purchaseId,
                     bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-                });
+                }));
             }
         }
     },

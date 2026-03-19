@@ -214,3 +214,25 @@ export const formatReceiptToText = (receipt: any, customer: any) => {
 
     return lines.join('\n');
 };
+
+export function cleanFirestoreData(data: any, path: string = 'root'): any {
+    if (data === undefined) {
+        console.warn(`[Firestore Sanitizer] Value is undefined at: ${path}`);
+        return null;
+    }
+    if (data === null) return null;
+    if (Array.isArray(data)) {
+        return data.map((item, index) => cleanFirestoreData(item, `${path}[${index}]`));
+    }
+    if (typeof data === 'object' && data !== null) {
+        const cleaned: any = {};
+        for (const key in data) {
+            const val = cleanFirestoreData(data[key], `${path}.${key}`);
+            if (val !== undefined) {
+                cleaned[key] = val;
+            }
+        }
+        return cleaned;
+    }
+    return data;
+}

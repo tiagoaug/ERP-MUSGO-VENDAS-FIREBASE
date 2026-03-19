@@ -2,7 +2,7 @@
 import { db } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch, increment } from 'firebase/firestore';
 import { Sale, SaleItem, PaymentRecord } from '../types';
-import { generateId, sanitizeBankAccountId } from '../lib/utils';
+import { generateId, sanitizeBankAccountId, cleanFirestoreData } from '../lib/utils';
 import { bankAccountService } from './bankAccountService';
 
 const buildSale = (row: any, id: string, items: any[], paymentHistory: any[]): Sale => ({
@@ -81,39 +81,39 @@ export const saleService = {
         }
 
         // 2. Insere a venda
-        batch.set(saleRef, {
-            sale_number: sale.saleNumber,
-            date: sale.date,
-            due_date: sale.dueDate || sale.date,
-            customer_id: sale.customerId,
-            total_value: sale.totalValue,
-            amount_paid: finalAmountPaid,
-            is_paid: finalIsPaid,
-            payment_type: sale.paymentType,
-            status: sale.status,
-            discount: sale.discount,
-            delivery_method: sale.deliveryMethod,
-            delivery_address: sale.deliveryAddress,
-            comments: sale.comments,
-            private_notes: sale.privateNotes,
-            requires_approval: sale.requiresApproval,
+        batch.set(saleRef, cleanFirestoreData({
+            sale_number: sale.saleNumber || '',
+            date: sale.date || new Date().toISOString(),
+            due_date: sale.dueDate || sale.date || new Date().toISOString(),
+            customer_id: sale.customerId || null,
+            total_value: sale.totalValue || 0,
+            amount_paid: finalAmountPaid || 0,
+            is_paid: !!finalIsPaid,
+            payment_type: sale.paymentType || 'cash',
+            status: sale.status || 'Pendente',
+            discount: sale.discount || 0,
+            delivery_method: sale.deliveryMethod || null,
+            delivery_address: sale.deliveryAddress || null,
+            comments: sale.comments || null,
+            private_notes: sale.privateNotes || null,
+            requires_approval: !!sale.requiresApproval,
             bank_account_id: sanitizeBankAccountId(sale.bankAccountId) || null,
-        });
+        }));
 
         // 3. Insere os itens
         if (sale.items?.length) {
             sale.items.forEach(i => {
                 const iRef = doc(collection(db, 'sale_items'));
-                batch.set(iRef, {
+                batch.set(iRef, cleanFirestoreData({
                     sale_id: saleId,
-                    product_id: i.productId,
+                    product_id: i.productId || null,
                     variation_id: i.variationId || null,
                     distribution_id: i.distributionId || null,
-                    is_wholesale: i.isWholesale,
+                    is_wholesale: !!i.isWholesale,
                     color_id: i.colorId || null,
-                    quantity: i.quantity,
-                    price_at_sale: i.priceAtSale,
-                });
+                    quantity: i.quantity || 0,
+                    price_at_sale: i.priceAtSale || 0,
+                }));
             });
         }
 
@@ -129,7 +129,7 @@ export const saleService = {
 
         paymentRecordsToAdd.forEach(pr => {
             const prRef = doc(collection(db, 'payment_records'));
-            batch.set(prRef, pr);
+            batch.set(prRef, cleanFirestoreData(pr));
         });
 
         // 5. Registra transação financeira e ajuste de troco/haver
@@ -144,14 +144,14 @@ export const saleService = {
 
         if (sale.status !== 'Aguardando Aprovação' && sale.status !== 'Aguardando Estoque' && realMoneyPaid > 0) {
             const tRef = doc(collection(db, 'transactions'));
-            batch.set(tRef, {
-                date: sale.date, 
+            batch.set(tRef, cleanFirestoreData({
+                date: sale.date || new Date().toISOString(), 
                 type: 'payment',
-                amount: realMoneyPaid, 
-                description: `Venda ${sale.saleNumber}`,
+                amount: realMoneyPaid || 0, 
+                description: `Venda ${sale.saleNumber || ''}`,
                 related_id: saleId,
                 bank_account_id: sanitizeBankAccountId(sale.bankAccountId) || null
-            });
+            }));
         }
 
         // 6. Baixa o estoque
@@ -242,40 +242,40 @@ export const saleService = {
         }
 
         // Update Sale
-        batch.update(saleRef, {
-            sale_number: updatedSale.saleNumber,
-            date: updatedSale.date,
-            due_date: updatedSale.dueDate || updatedSale.date,
-            customer_id: updatedSale.customerId,
-            total_value: updatedSale.totalValue,
-            amount_paid: updatedSale.amountPaid,
-            is_paid: updatedSale.isPaid,
-            payment_type: updatedSale.paymentType,
-            status: updatedSale.status,
-            discount: updatedSale.discount,
-            delivery_method: updatedSale.deliveryMethod,
-            delivery_address: updatedSale.deliveryAddress,
-            comments: updatedSale.comments,
-            private_notes: updatedSale.privateNotes,
-            requires_approval: updatedSale.requiresApproval,
+        batch.update(saleRef, cleanFirestoreData({
+            sale_number: updatedSale.saleNumber || '',
+            date: updatedSale.date || new Date().toISOString(),
+            due_date: updatedSale.dueDate || updatedSale.date || new Date().toISOString(),
+            customer_id: updatedSale.customerId || null,
+            total_value: updatedSale.totalValue || 0,
+            amount_paid: updatedSale.amountPaid || 0,
+            is_paid: !!updatedSale.isPaid,
+            payment_type: updatedSale.paymentType || 'cash',
+            status: updatedSale.status || 'Pendente',
+            discount: updatedSale.discount || 0,
+            delivery_method: updatedSale.deliveryMethod || null,
+            delivery_address: updatedSale.deliveryAddress || null,
+            comments: updatedSale.comments || null,
+            private_notes: updatedSale.privateNotes || null,
+            requires_approval: !!updatedSale.requiresApproval,
             bank_account_id: sanitizeBankAccountId(updatedSale.bankAccountId) || null,
-        });
+        }));
 
         // Delete and Re-insert items
         oldItemsSnap.forEach(d => batch.delete(d.ref));
         if (updatedSale.items?.length) {
             updatedSale.items.forEach(i => {
                 const iRef = doc(collection(db, 'sale_items'));
-                batch.set(iRef, {
+                batch.set(iRef, cleanFirestoreData({
                     sale_id: updatedSale.id,
-                    product_id: i.productId,
+                    product_id: i.productId || null,
                     variation_id: i.variationId || null,
                     distribution_id: i.distributionId || null,
-                    is_wholesale: i.isWholesale,
+                    is_wholesale: !!i.isWholesale,
                     color_id: i.colorId || null,
-                    quantity: i.quantity,
-                    price_at_sale: i.priceAtSale,
-                });
+                    quantity: i.quantity || 0,
+                    price_at_sale: i.priceAtSale || 0,
+                }));
             });
         }
 
@@ -285,12 +285,12 @@ export const saleService = {
         if (updatedSale.paymentHistory?.length) {
             updatedSale.paymentHistory.forEach(p => {
                 const pRef = doc(collection(db, 'payment_records'));
-                batch.set(pRef, {
+                batch.set(pRef, cleanFirestoreData({
                     sale_id: updatedSale.id,
                     date: p.date,
                     amount: p.amount,
                     note: p.note
-                });
+                }));
             });
         }
 
@@ -361,23 +361,23 @@ export const saleService = {
         batch.update(saleRef, { amount_paid: newAmountPaid, is_paid: isPaid });
 
         const payRef = doc(collection(db, 'payment_records'));
-        batch.set(payRef, {
+        batch.set(payRef, cleanFirestoreData({
             sale_id: saleId,
             date,
             amount: amountToApply,
             note: excess > 0 ? `Recebimento (Excesso de R$ ${excess} p/ Haver)` : 'Recebimento'
-        });
+        }));
 
         if (accounted) {
             const tRef = doc(collection(db, 'transactions'));
-            batch.set(tRef, {
+            batch.set(tRef, cleanFirestoreData({
                 date,
                 type: 'payment',
                 amount: amount,
                 description: `Recebimento Venda ${sale.sale_number}`,
                 related_id: saleId,
                 bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-            });
+            }));
         }
 
         if (excess > 0) {
@@ -453,14 +453,14 @@ export const saleService = {
             });
         } else {
             const tRef = doc(collection(db, 'transactions'));
-            batch.set(tRef, {
+            batch.set(tRef, cleanFirestoreData({
                 date: newDate,
                 type: 'payment',
                 amount: newAmount,
                 description: `Recebimento Venda ${sale.sale_number || 'Editada'}`,
                 related_id: saleId,
                 bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
-            });
+            }));
         }
 
         await batch.commit();

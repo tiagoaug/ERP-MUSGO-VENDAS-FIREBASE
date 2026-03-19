@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Gestão Pro - Controle de Vendas</title>
+    <meta name="description" content="Sistema ERP de controle de vendas e estoque">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GestãoPro">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="manifest" href="/manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Google API Scripts -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#1e293b', // Grafite customizado
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: background-color 0.3s ease;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* Custom scrollbar for a modern look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .animate-slideUp {
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+
+        /* ===== Mobile Improvements ===== */
+
+        /* Suporte Safe Area (iPhone notch / home indicator) */
+        .bottom-nav-safe {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        /* Animação slideInBottom para menu mobile */
+        .animate-slideInBottom {
+            animation: slideInBottom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideInBottom {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Melhorar tap highlight em mobile */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Previne zoom ao focar inputs no iOS */
+        input,
+        select,
+        textarea {
+            font-size: 16px !important;
+        }
+
+        @media (min-width: 640px) {
+
+            input,
+            select,
+            textarea {
+                font-size: inherit !important;
+            }
+        }
+
+        /* Smooth scroll no mobile */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Bottom nav — altura fixa com safe area do iOS */
+        .bottom-nav-height {
+            height: calc(60px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        /* Otimização de performance em elementos animados */
+        .bottom-nav-btn {
+            will-change: transform;
+            touch-action: manipulation;
+        }
+
+        .dynamic-width {
+            width: var(--progress, 0%);
+        }
+
+        .dynamic-bg {
+            background-color: var(--bg-color);
+        }
+
+        .dynamic-shadow {
+            box-shadow: 0 0 10px var(--shadow-color);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

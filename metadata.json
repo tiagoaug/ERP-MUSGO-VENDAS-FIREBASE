@@ -1,0 +1,8 @@
+{
+  "name": "Musgo fábrica alpha 0.5",
+  "description": "Sistema completo para controle de vendas diretas, estoque, gestão de clientes, fornecedores e relatórios financeiros.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}

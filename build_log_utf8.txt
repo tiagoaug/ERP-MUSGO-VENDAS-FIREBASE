@@ -1,0 +1,86 @@
+﻿
+> musgo-f├íbrica-alpha-0.5@0.0.0 build
+> vite build
+
+[36mvite v6.4.1 [32mbuilding for production...[36m[39m
+transforming...
+[32mÔ£ô[39m 4714 modules transformed.
+rendering chunks...
+node.exe : [33m[plugin 
+vite:reporter] 
+No linha:1 caractere:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo          : 
+NotSpe    cified: ([33m[plugin 
+vite:repor    ter] :String) [], 
+RemoteExceptio    n
+    + FullyQualifiedErrorId : 
+Native    CommandError
+ 
+(!) C:/Users/SISTEMAS-PC/Desktop/
+PROJETOS ANTIGRAVIT/erp controle 
+de vendas e 
+estoque/lib/pdfGenerator.ts is 
+dynamically imported by C:/Users/
+SISTEMAS-PC/Desktop/PROJETOS 
+ANTIGRAVIT/erp controle de 
+vendas e 
+estoque/views/VenderView.tsx, C:/
+Users/SISTEMAS-PC/Desktop/PROJETO
+S ANTIGRAVIT/erp controle de 
+vendas e 
+estoque/views/VenderView.tsx but 
+also statically imported by C:/Us
+ers/SISTEMAS-PC/Desktop/PROJETOS 
+ANTIGRAVIT/erp controle de 
+vendas e estoque/components/Custo
+merDetailModal.tsx, C:/Users/SIST
+EMAS-PC/Desktop/PROJETOS 
+ANTIGRAVIT/erp controle de 
+vendas e estoque/views/Relacionam
+entoComprasView.tsx, C:/Users/SIS
+TEMAS-PC/Desktop/PROJETOS 
+ANTIGRAVIT/erp controle de 
+vendas e estoque/views/Relacionam
+entoVendasView.tsx, C:/Users/SIST
+EMAS-PC/Desktop/PROJETOS 
+ANTIGRAVIT/erp controle de 
+vendas e estoque/views/Relatorios
+View.tsx, C:/Users/SISTEMAS-PC/De
+sktop/PROJETOS ANTIGRAVIT/erp 
+controle de vendas e estoque/view
+s/VendasHistoryView.tsx, C:/Users
+/SISTEMAS-PC/Desktop/PROJETOS 
+ANTIGRAVIT/erp controle de 
+vendas e 
+estoque/views/VenderView.tsx, 
+dynamic import will not move 
+module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32massets/manifest-DTOly7dQ.json  [39m[1m[2m    0.74 kB[22m[1m[22m[2m Ôöé gzip:   0.34 kB[22m
+[2mdist/[22m[32mindex.html                     [39m[1m[2m    5.50 kB[22m[1m[22m[2m Ôöé gzip:   1.76 kB[22m
+[2mdist/[22m[36massets/web-Bqd_KAxd.js         [39m[1m[2m    0.36 kB[22m[1m[22m[2m Ôöé gzip:   0.25 kB[22m
+[2mdist/[22m[36massets/web-BxRw1WkK.js         [39m[1m[2m    8.73 kB[22m[1m[22m[2m Ôöé gzip:   2.97 kB[22m
+[2mdist/[22m[36massets/index-z0nsApWU.js       [39m[1m[33m1,560.79 kB[39m[22m[2m Ôöé gzip: 364.87 kB[22m
+[33m
+(!) Some chunks are larger than 
+500 kB after minification. 
+Consider:
+- Using dynamic import() to 
+code-split the application
+- Use build.rollupOptions.output.
+manualChunks to improve 
+chunking: https://rollupjs.org/co
+nfiguration-options/#output-manua
+lchunks
+- Adjust chunk size limit for 
+this warning via 
+build.chunkSizeWarningLimit.[39m
+[32mÔ£ô built in 5.88s[39m

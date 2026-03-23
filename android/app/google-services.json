@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "106422037058",
+    "project_id": "erp-controle-de-vendas-musgo",
+    "storage_bucket": "erp-controle-de-vendas-musgo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:106422037058:android:1476076c985a0d985c9bdb",
+        "android_client_info": {
+          "package_name": "com.gestaopro.erp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeEd-trbtgmRmbX474QtAu2b7F-0qoTb8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Plus, Trash, PencilSimple, X, Basket, AddressBook, MagnifyingGlass, User, ArrowClockwise, ShoppingBag } from '@phosphor-icons/react';
 import { SupplierDetailModal } from '../components/SupplierDetailModal';
 import { Purchase, Sale, Customer, Supplier, Category } from '../types';
+import { Contacts } from '@capacitor-community/contacts';
 import { Field } from '../components/ui/Field';
 import { IconButton } from '../components/ui/IconButton';
 
@@ -72,33 +73,28 @@ export const FornecedoresView = ({ suppliers, purchases, sales, customers, onAdd
   };
 
   const handleImportContact = async () => {
-    // Verificação de segurança: API de contatos não funciona em iframes
-    if (window.self !== window.top) {
-      alert("A importação de contatos nativa não funciona no modo de pré-visualização (iframe). Por favor, abra o aplicativo em uma nova aba ou no seu dispositivo móvel para usar esta função.");
-      return;
-    }
-
     try {
-      // @ts-ignore
-      if ('contacts' in navigator && 'ContactsManager' in window) {
-        const props = ['name', 'tel', 'email'];
-        const opts = { multiple: false };
-        // @ts-ignore
-        const contacts = await navigator.contacts.select(props, opts);
-        if (contacts.length) {
-          const c = contacts[0];
-          setForm({
-            ...form,
-            name: c.name?.[0] || form.name,
-            phone: c.tel?.[0] || form.phone,
-            email: c.email?.[0] || form.email,
-          });
-        }
-      } else {
-        alert("Importação não suportada neste navegador. Tente usar Chrome no Android ou Safari no iOS.");
+      const permission = await Contacts.requestPermissions();
+      if (permission.contacts !== 'granted') {
+        alert("Permissão para acessar a agenda foi negada.");
+        return;
       }
-    } catch (e) {
+      
+      const result = await Contacts.pickContact({
+        projection: { name: true, phones: true, emails: true }
+      });
+      
+      if (result.contact) {
+        setForm({
+          ...form,
+          name: result.contact.name?.display || form.name,
+          phone: result.contact.phones?.[0]?.number || form.phone,
+          email: result.contact.emails?.[0]?.address || form.email
+        });
+      }
+    } catch (e: any) {
       console.error(e);
+      alert("Não foi possível importar o contato: " + (e.message || "Erro desconhecido"));
     }
   };
 

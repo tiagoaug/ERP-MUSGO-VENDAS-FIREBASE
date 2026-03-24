@@ -334,10 +334,6 @@ const App: React.FC = () => {
           {[
             { view: 'dashboard' as ViewType, label: 'Início / Dashboard', color: 'bg-slate-700', icon: <House size={20} weight="duotone" /> },
             { view: 'vender' as ViewType, label: 'Nova Venda', color: 'bg-emerald-600', icon: <ShoppingCart size={20} weight="duotone" /> },
-            { view: 'relacionamento' as ViewType, label: 'Relacionamento Cliente', color: 'bg-rose-600', icon: <Handshake size={20} weight="duotone" /> },
-            { view: 'clientes' as ViewType, label: 'Base Clientes', color: 'bg-blue-600', icon: <Users size={20} weight="duotone" /> },
-            { view: 'relacionamento_fornecedores' as ViewType, label: 'Relac. Fornecedores', color: 'bg-emerald-700', icon: <Handshake size={20} weight="duotone" /> },
-            { view: 'fornecedores' as ViewType, label: 'Base Fornecedores', color: 'bg-emerald-600', icon: <AddressBook size={20} weight="duotone" /> },
             { view: 'cadastros' as ViewType, label: 'Cadastros', color: 'bg-slate-600', icon: <Gear size={20} weight="duotone" /> },
             { view: 'produtos' as ViewType, label: 'Produtos', color: 'bg-orange-600', icon: <Stack size={20} weight="duotone" /> },
             { view: 'estoque' as ViewType, label: 'Estoque', color: 'bg-indigo-600', icon: <Package size={20} weight="duotone" /> },
@@ -346,6 +342,10 @@ const App: React.FC = () => {
             { view: 'financeiro_pessoal' as ViewType, label: 'Fin. Pessoal', color: 'bg-blue-600', icon: <ChartPie size={20} weight="duotone" /> },
             { view: 'financeiro_pessoal_relatorios' as ViewType, label: 'Relatórios Fin. Pessoal', color: 'bg-purple-600', icon: <ChartPie size={20} weight="duotone" /> },
             { view: 'recebimentos' as ViewType, label: 'Entradas', color: 'bg-indigo-500', icon: <CurrencyDollar size={20} weight="duotone" /> },
+            { view: 'clientes' as ViewType, label: 'B.CLIENTES', color: 'bg-red-600', icon: <AddressBook size={20} weight="duotone" /> },
+            { view: 'fornecedores' as ViewType, label: 'B.FORN', color: 'bg-emerald-600', icon: <AddressBook size={20} weight="duotone" /> },
+            { view: 'relacionamento' as ViewType, label: 'R.CLIENTES', color: 'bg-rose-600', icon: <Handshake size={20} weight="duotone" /> },
+            { view: 'relacionamento_fornecedores' as ViewType, label: 'R.FORNEC', color: 'bg-emerald-700', icon: <Handshake size={20} weight="duotone" /> },
             { view: 'vendas' as ViewType, label: 'Histórico', color: 'bg-cyan-700', icon: <ClockCounterClockwise size={20} weight="duotone" /> },
             { view: 'relatorios' as ViewType, label: 'Relatórios e Backup', color: 'bg-cyan-600', icon: <ChartPie size={20} weight="duotone" /> },
             { view: 'agenda' as ViewType, label: 'Agenda', color: 'bg-violet-600', icon: <CalendarBlank size={20} weight="duotone" /> },
@@ -396,11 +396,7 @@ const App: React.FC = () => {
           <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar">
             <NavItem active={view === 'dashboard'} icon={<House size={16} weight="duotone" />} label="Início" onClick={() => handleNavigation('dashboard')} />
             <NavItem active={view === 'vender'} icon={<ShoppingCart size={16} weight="duotone" className="text-emerald-500" />} label="Nova Venda" onClick={() => handleNavigation('vender')} />
-            <NavItem active={view === 'relacionamento'} icon={<Handshake size={16} weight="duotone" className="text-rose-500" />} label="Relacionamento Cliente" onClick={() => handleNavigation('relacionamento')} />
             <div className="py-2"><hr className="border-slate-100 dark:border-slate-800" /></div>
-            <NavItem active={view === 'clientes'} icon={<Users size={16} weight="duotone" className="text-blue-500" />} label="Base Clientes" onClick={() => handleNavigation('clientes')} />
-            <NavItem active={view === 'relacionamento_fornecedores'} icon={<Handshake size={16} weight="duotone" className="text-emerald-600" />} label="Relac. Fornecedores" onClick={() => handleNavigation('relacionamento_fornecedores')} />
-            <NavItem active={view === 'fornecedores'} icon={<AddressBook size={16} weight="duotone" className="text-emerald-500" />} label="Fornecedores" onClick={() => handleNavigation('fornecedores')} />
             <NavItem active={view === 'cadastros'} icon={<Gear size={16} weight="duotone" className="text-slate-500" />} label="Configurações" onClick={() => handleNavigation('cadastros')} />
             <NavItem active={view === 'produtos'} icon={<Stack size={16} weight="duotone" className="text-orange-500" />} label="Produtos" onClick={() => handleNavigation('produtos')} />
             <NavItem active={view === 'estoque'} icon={<Package size={16} weight="duotone" className="text-indigo-500" />} label="Estoque" onClick={() => handleNavigation('estoque')} />
@@ -409,6 +405,12 @@ const App: React.FC = () => {
             <NavItem active={view === 'financeiro'} icon={<ChartBar size={16} weight="duotone" className="text-green-500" />} label="Financeiro Emp." onClick={() => handleNavigation('financeiro')} />
             <NavItem active={view === 'financeiro_pessoal'} icon={<ChartPie size={16} weight="duotone" className="text-blue-500" />} label="Fin. Pessoal" onClick={() => handleNavigation('financeiro_pessoal')} />
             <NavItem active={view === 'recebimentos'} icon={<CurrencyDollar size={16} weight="duotone" className="text-indigo-400" />} label="Entradas" onClick={() => handleNavigation('recebimentos')} />
+            <div className="py-2"><hr className="border-slate-100 dark:border-slate-800" /></div>
+            <NavItem active={view === 'clientes'} icon={<AddressBook size={16} weight="duotone" className="text-red-500" />} label="B.CLIENTES" onClick={() => handleNavigation('clientes')} />
+            <NavItem active={view === 'fornecedores'} icon={<AddressBook size={16} weight="duotone" className="text-emerald-500" />} label="B.FORN" onClick={() => handleNavigation('fornecedores')} />
+            <NavItem active={view === 'relacionamento'} icon={<Handshake size={16} weight="duotone" className="text-rose-500" />} label="R.CLIENTES" onClick={() => handleNavigation('relacionamento')} />
+            <NavItem active={view === 'relacionamento_fornecedores'} icon={<Handshake size={16} weight="duotone" className="text-emerald-600" />} label="R.FORNEC" onClick={() => handleNavigation('relacionamento_fornecedores')} />
+            <div className="py-2"><hr className="border-slate-100 dark:border-slate-800" /></div>
             <NavItem active={view === 'vendas'} icon={<ClockCounterClockwise size={16} weight="duotone" />} label="Histórico" onClick={() => handleNavigation('vendas')} />
             <NavItem active={view === 'relatorios'} icon={<ChartPie size={16} weight="duotone" />} label="Relatórios e Backup" onClick={() => handleNavigation('relatorios')} />
           </nav>

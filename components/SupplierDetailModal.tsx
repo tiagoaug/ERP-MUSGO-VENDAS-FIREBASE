@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Customer, Sale, Purchase, Supplier } from '../types';
+import { Customer, Sale, Purchase, Supplier, Category } from '../types';
 import { Field } from './ui/Field';
 import { IconButton } from './ui/IconButton';
 import { X, PencilSimple, FileText, User, ClockCounterClockwise, MapPin, MagnifyingGlass, Note, Wallet, Warning, ArrowClockwise, CurrencyDollar } from '@phosphor-icons/react';
@@ -17,6 +17,7 @@ interface SupplierDetailModalProps {
     purchases: Purchase[];
     sales?: Sale[];
     customers?: Customer[];
+    categories?: Category[];
     onClose: () => void;
     onUpdate: (s: Supplier) => void;
     onAddPayment?: (purchaseId: string) => void;
@@ -30,7 +31,7 @@ const handleOpenMaps = (address: string) => {
     }
 };
 
-export const SupplierDetailModal = ({ supplier, purchases, sales = [], customers = [], onClose, onUpdate, onAddPayment }: SupplierDetailModalProps) => {
+export const SupplierDetailModal = ({ supplier, purchases, sales = [], customers = [], categories = [], onClose, onUpdate, onAddPayment }: SupplierDetailModalProps) => {
     const [activeTab, setActiveTab] = useState<'financial' | 'history' | 'data'>('financial');
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(supplier);
@@ -261,10 +262,42 @@ export const SupplierDetailModal = ({ supplier, purchases, sales = [], customers
                             <div className="space-y-4 animate-fadeIn">
                                 <Field label="Razão Social / Nome" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} />
                                 <Field label="Contato / Representante" value={formData.contact} onChange={v => setFormData({ ...formData, contact: v })} />
-                                <Field label="Telefone" value={formData.phone || ''} onChange={v => setFormData({ ...formData, phone: v })} />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Field label="Telefone" value={formData.phone || ''} onChange={v => setFormData({ ...formData, phone: v })} />
+                                    <div className="flex flex-col gap-1 w-full">
+                                        <label className="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Tipo</label>
+                                        <select
+                                            value={formData.type}
+                                            onChange={e => setFormData({ ...formData, type: e.target.value as any, categoryId: e.target.value === 'Estoque' ? '' : formData.categoryId })}
+                                            aria-label="Tipo de fornecedor"
+                                            title="Tipo de fornecedor"
+                                            className="w-full bg-slate-50 dark:bg-slate-800/40 border dark:border-slate-800 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition-all dark:text-white"
+                                        >
+                                            <option value="Estoque">Estoque (Peças)</option>
+                                            <option value="Geral">Geral (Serviços/Insumos)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                {formData.type === 'Geral' && categories.length > 0 && (
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Categoria (Opcional)</label>
+                                        <select
+                                            value={formData.categoryId || ''}
+                                            onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
+                                            aria-label="Categoria do Fornecedor"
+                                            title="Categoria do Fornecedor"
+                                            className="w-full bg-slate-50 dark:bg-slate-800/40 border dark:border-slate-800 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition-all dark:text-white"
+                                        >
+                                            <option value="">Sem Categoria Específica</option>
+                                            {categories.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 <Field label="E-mail" value={formData.email || ''} onChange={v => setFormData({ ...formData, email: v })} />
                             </div> :
-                            <div className="space-y-6 animate-fadeIn">
+                            <div className="space-y-4 animate-fadeIn">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border dark:border-slate-800">
                                         <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Contato</span>
@@ -275,9 +308,18 @@ export const SupplierDetailModal = ({ supplier, purchases, sales = [], customers
                                         <p className="text-xs font-bold dark:text-white">{supplier.phone || 'Não informado'}</p>
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border dark:border-slate-800">
-                                    <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">E-mail</span>
-                                    <p className="text-xs font-bold dark:text-white">{supplier.email || 'Não informado'}</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border dark:border-slate-800">
+                                        <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">E-mail</span>
+                                        <p className="text-xs font-bold dark:text-white">{supplier.email || 'Não informado'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border dark:border-slate-800">
+                                        <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Tipo</span>
+                                        <p className="text-xs font-bold dark:text-white">
+                                            {supplier.type}
+                                            {supplier.type === 'Geral' && supplier.categoryId && categories ? ` • ${categories.find(c => c.id === supplier.categoryId)?.name || 'Sem categoria'}` : ''}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                     )}

@@ -33,7 +33,7 @@ const saveAsPDF = async (doc: any, title: string, format: string) => {
 
             await Share.share({
                 title: `Relatório: ${title}`,
-                text: `Relatório gerado pelo sistema Gestão Pro`,
+                text: `Relatório gerado pelo sistema MUSGO ERP`,
                 url: savedFile.uri,
                 dialogTitle: 'Abrir/Compartilhar Relatório',
             });
@@ -189,7 +189,7 @@ export const generateReportPDF = async (
     // Rodapé
     doc.setFontSize(isMobile ? 6 : 8);
     doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
-    const footerText = "DOCUMENTO GERADO PELO SISTEMA GESTÃO PRO v3.0";
+    const footerText = "DOCUMENTO GERADO PELO SISTEMA MUSGO ERP v3.0";
     doc.text(footerText, pageWidth / 2, finalY, { align: 'center' });
 
     await saveAsPDF(doc, reportTitle, format);
@@ -268,7 +268,7 @@ export const exportBudgetPDF = async ({ customer, items, totalValue, date }: { c
 
     doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]); doc.setFontSize(6);
     doc.text("ESTE DOCUMENTO NÃO POSSUI VALOR FISCAL", pageWidth / 2, finalY + 25, { align: 'center' });
-    doc.text("GERADO POR GESTÃO PRO ERP", pageWidth / 2, finalY + 28, { align: 'center' });
+    doc.text("GERADO POR MUSGO ERP", pageWidth / 2, finalY + 28, { align: 'center' });
 
     await saveAsPDF(doc, "Orcamento", "digital");
 };
@@ -423,7 +423,7 @@ export const exportSaleByNumberPDF = async (sale: Sale, customer: Customer | und
     doc.setTextColor(180); doc.setFontSize(6);
     doc.text("ESTE DOCUMENTO NÃO POSSUI VALOR FISCAL", pageWidth / 2, finalY + 12, { align: 'center' });
     doc.text("OBRIGADO PELA PREFERÊNCIA!", pageWidth / 2, finalY + 15, { align: 'center' });
-    doc.text("GESTÃO PRO v3.0 - COMPROVANTE DIGITAL", pageWidth / 2, finalY + 18, { align: 'center' });
+    doc.text("MUSGO ERP v3.0 - COMPROVANTE DIGITAL", pageWidth / 2, finalY + 18, { align: 'center' });
 
     await saveAsPDF(doc, "Recibo", sale.saleNumber);
 };
@@ -475,7 +475,7 @@ export const exportSeparationListPDF = async ({ customer, items, date }: { custo
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]); doc.setFontSize(6);
     doc.text("CONFERIDO POR: ___________________________", 8, finalY + 5);
-    doc.text("GERADO POR GESTÃO PRO ERP", pageWidth / 2, finalY + 15, { align: 'center' });
+    doc.text("GERADO POR MUSGO ERP", pageWidth / 2, finalY + 15, { align: 'center' });
 
     await saveAsPDF(doc, "Lista_Separacao", "doc");
 };
@@ -641,7 +641,7 @@ export const exportReceiptPDF = async (receipt: any, customer: Customer | undefi
     // Footer
     doc.setTextColor(180); doc.setFontSize(6);
     doc.text("ESTE DOCUMENTO NÃO POSSUI VALOR FISCAL", pageWidth / 2, finalY + 15, { align: 'center' });
-    doc.text("GERADO POR GESTÃO PRO v3.0", pageWidth / 2, finalY + 18, { align: 'center' });
+    doc.text("GERADO POR MUSGO ERP v3.0", pageWidth / 2, finalY + 18, { align: 'center' });
 
     await saveAsPDF(doc, "Recibo", receipt.receiptNumber);
 };

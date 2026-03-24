@@ -235,6 +235,7 @@ export const FornecedoresView = ({ suppliers, purchases, sales, customers, onAdd
           purchases={purchases.filter(p => p.supplierId === selectedSupplier.id)}
           sales={sales}
           customers={customers}
+          categories={categories}
           onClose={() => setSelectedSupplier(null)}
           onUpdate={(updated) => { onAddOrUpdate(updated); setSelectedSupplier(null); }}
           onAddPayment={onAddPayment}

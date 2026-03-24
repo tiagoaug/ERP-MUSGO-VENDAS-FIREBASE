@@ -111,6 +111,15 @@ export const AIAssistant = ({ currentView, isOpen, onClose }: AIAssistantProps) 
         'Transações sinalizadas como "Pró-labore" no financeiro da empresa entram aqui como receita!',
         'Crie categorias detalhadas para saber exatamente onde seu dinheiro está indo.'
       ]
+    },
+    financeiro_pessoal_relatorios: {
+      steps: [
+        'Veja seus resumos por períodos',
+        'Avalie metas e limites de gastos pessoais'
+      ],
+      tips: [
+        'Acompanhe mensalmente se você poupou o valor planejado'
+      ]
     }
   };
 
@@ -137,7 +146,7 @@ export const AIAssistant = ({ currentView, isOpen, onClose }: AIAssistantProps) 
         model: 'gemini-3-flash-preview',
         contents: userMsg,
         config: {
-          systemInstruction: `Você é o Lampy do sistema Gestão Pro. O usuário está na tela ${currentView}. Responda de forma curta e prática.`,
+          systemInstruction: `Você é o Lampy do sistema MUSGO ERP. O usuário está na tela ${currentView}. Responda de forma curta e prática.`,
         },
       });
 

@@ -79,7 +79,7 @@ export const formatSaleToText = (sale: any, customer: any, products: any[], colo
         lines.push(`🔴 RESTANTE: R$ ${formatMoney(sale.totalValue - (sale.amountPaid || 0))}`);
     }
     lines.push('');
-    lines.push('Gerado via Gestão Pro ERP');
+    lines.push('Gerado via MUSGO ERP');
 
     return lines.join('\n');
 };
@@ -112,7 +112,7 @@ export const formatSaleToSeparationText = (sale: any, customer: any, products: a
     });
 
     lines.push('');
-    lines.push('Gerado via Gestão Pro ERP');
+    lines.push('Gerado via MUSGO ERP');
 
     return lines.join('\n');
 };
@@ -150,7 +150,7 @@ export const formatSaleToSimpleListText = (sale: any, customer: any, products: a
     lines.push('');
     lines.push(`VALOR TOTAL: R$ ${formatMoney(sale.totalValue)}`);
     lines.push('');
-    lines.push('Gerado via Gestão Pro ERP');
+    lines.push('Gerado via MUSGO ERP');
 
     return lines.join('\n');
 };
@@ -210,7 +210,7 @@ export const formatReceiptToText = (receipt: any, customer: any) => {
     }
 
     lines.push('');
-    lines.push('Gerado via Gestão Pro ERP');
+    lines.push('Gerado via MUSGO ERP');
 
     return lines.join('\n');
 };

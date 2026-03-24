@@ -95,7 +95,7 @@ export const generateReportPDF = async (
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-        doc.text("GESTAO PRO ERP", margin, 32);
+        doc.text("MUSGO ERP", margin, 32);
 
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');

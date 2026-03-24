@@ -153,7 +153,6 @@ const App: React.FC = () => {
         receipts={data.receipts}
         transactions={data.transactions}
         bankAccounts={data.bankAccounts}
-        onPopulate={actions.populateAuditData}
         onNavigateToPurchase={(supplierId, purchaseId) => {
           setTargetRelationshipPurchaseId({ supplierId, purchaseId });
           handleNavigation('relacionamento_fornecedores');
@@ -305,7 +304,7 @@ const App: React.FC = () => {
         onSync={actions.syncData}
         onTestConnection={actions.testConnection}
       />;
-      default: return <DashboardView stats={stats} setView={handleNavigation} sales={data.sales} customers={data.customers} purchases={data.purchases} suppliers={data.suppliers} categories={data.categories} receipts={data.receipts} transactions={data.transactions} bankAccounts={data.bankAccounts} onPopulate={actions.populateAuditData} products={data.products} grids={data.grids} colors={data.colors} />;
+      default: return <DashboardView stats={stats} setView={handleNavigation} sales={data.sales} customers={data.customers} purchases={data.purchases} suppliers={data.suppliers} categories={data.categories} receipts={data.receipts} transactions={data.transactions} bankAccounts={data.bankAccounts} products={data.products} grids={data.grids} colors={data.colors} />;
     }
   };
 
@@ -389,7 +388,7 @@ const App: React.FC = () => {
         <div className="p-4 flex flex-col h-full">
           <div className="flex items-center justify-between mb-8 pl-2 mt-2">
             <div className="flex items-center gap-2 font-black text-blue-600 text-[11px] uppercase tracking-tighter">
-              <Lightning size={16} weight="fill" /> GestãoPro
+              <Lightning size={16} weight="fill" /> MUSGO ERP
             </div>
             <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 text-slate-400" title="Fechar menu" aria-label="Fechar menu"><X size={16} weight="bold" /></button>
           </div>

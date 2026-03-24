@@ -27,7 +27,6 @@ interface DashboardViewProps {
   receipts: Receipt[];
   transactions: Transaction[];
   bankAccounts: any[]; // Incluindo bankAccounts
-  onPopulate: () => void;
   onNavigateToPurchase?: (supplierId: string, purchaseId: string) => void;
   onNavigateToSaleOrReceipt?: (customerId: string, id: string, type: 'sale' | 'receipt') => void;
   products?: Product[];
@@ -35,7 +34,7 @@ interface DashboardViewProps {
   colors?: AppColor[];
 }
 
-export const DashboardView = ({ stats, setView, sales, customers, purchases, suppliers, categories, receipts, transactions, bankAccounts, onPopulate, onNavigateToPurchase, onNavigateToSaleOrReceipt, products, grids, colors }: DashboardViewProps) => {
+export const DashboardView = ({ stats, setView, sales, customers, purchases, suppliers, categories, receipts, transactions, bankAccounts, onNavigateToPurchase, onNavigateToSaleOrReceipt, products, grids, colors }: DashboardViewProps) => {
   const [connStatus, setConnStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [lastError, setLastError] = useState<string | null>(null);
 

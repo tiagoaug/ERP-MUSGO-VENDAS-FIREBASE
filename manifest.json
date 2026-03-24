@@ -1,6 +1,6 @@
 {
-    "name": "GestãoPro - ERP",
-    "short_name": "GestãoPro",
+    "name": "MUSGO ERP",
+    "short_name": "MUSGO ERP",
     "description": "Sistema de controle de vendas e estoque",
     "start_url": "/",
     "display": "standalone",

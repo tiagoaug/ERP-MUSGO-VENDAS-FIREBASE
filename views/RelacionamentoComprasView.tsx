@@ -100,6 +100,19 @@ export const RelacionamentoComprasView = ({
         }
     }, [deepLinkTarget, onClearDeepLink]);
 
+    // Auto-scroll when a record is expanded via deep link
+    useEffect(() => {
+        if (expandedPurchaseId) {
+            // Wait for render/expansion animation
+            setTimeout(() => {
+                const element = document.getElementById(`purchase-${expandedPurchaseId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 300);
+        }
+    }, [expandedPurchaseId]);
+
     const [payAmount, setPayAmount] = useState<string>('');
     const [payDate, setPayDate] = useState<string>(new Date().toISOString().slice(0, 10));
     const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('cash');
@@ -239,7 +252,7 @@ export const RelacionamentoComprasView = ({
                             <Handshake size={20} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black uppercase dark:text-white leading-none tracking-tight">Relac. Fornecedores</h2>
+                            <h2 className="text-xl font-black uppercase dark:text-white leading-none tracking-tight">Histórico de Compras</h2>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Central de Finanças e Pagamentos</p>
                         </div>
                     </div>
@@ -404,7 +417,7 @@ export const RelacionamentoComprasView = ({
                                         const category = categories.find(c => c.id === p.categoryId);
 
                                         return (
-                                            <div key={p.id} className={`bg-white dark:bg-slate-900 border-2 dark:border-slate-800 rounded-3xl overflow-hidden transition-all ${isExpanded ? 'border-emerald-600 shadow-xl scale-[1.01]' : 'border-slate-100 hover:border-emerald-200'}`}>
+                                            <div key={p.id} id={`purchase-${p.id}`} className={`bg-white dark:bg-slate-900 border-2 dark:border-slate-800 rounded-3xl overflow-hidden transition-all duration-500 ${isExpanded ? 'border-emerald-600 shadow-2xl scale-[1.01]' : 'border-slate-100 hover:border-emerald-200'}`}>
                                                 <div className="p-5 flex flex-col sm:flex-row justify-between items-center cursor-pointer gap-4">
                                                     <div className="flex items-center gap-4 flex-1 w-full">
                                                         <div

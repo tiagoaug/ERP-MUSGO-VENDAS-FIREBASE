@@ -112,12 +112,21 @@ const App: React.FC = () => {
     return income - expense - reserve - planning;
   }, [data.personalTransactions]);
 
-
-
-  const handleNavigation = (targetView: ViewType) => {
+  const handleNavigation = (targetView: ViewType, isDeepLink = false) => {
     setView(targetView);
     setIsSidebarOpen(false);
     setIsShortcutsOpen(false);
+
+    // Limpa deep links se não for uma navegação de deep link
+    if (!isDeepLink) {
+      if (targetView !== 'relacionamento') {
+        setTargetRelationshipSaleId(undefined);
+      }
+      if (targetView !== 'relacionamento_fornecedores') {
+        setTargetRelationshipPurchaseId(undefined);
+      }
+    }
+
     if (targetView !== 'compras') {
       setTargetSupplierId(undefined);
     }
@@ -155,11 +164,11 @@ const App: React.FC = () => {
         bankAccounts={data.bankAccounts}
         onNavigateToPurchase={(supplierId, purchaseId) => {
           setTargetRelationshipPurchaseId({ supplierId, purchaseId });
-          handleNavigation('relacionamento_fornecedores');
+          handleNavigation('relacionamento_fornecedores', true);
         }}
         onNavigateToSaleOrReceipt={(customerId, saleId, type) => {
           setTargetRelationshipSaleId({ customerId, saleId, type });
-          handleNavigation('relacionamento');
+          handleNavigation('relacionamento', true);
         }}
         products={data.products}
         grids={data.grids}
@@ -343,8 +352,8 @@ const App: React.FC = () => {
             { view: 'recebimentos' as ViewType, label: 'Entradas', color: 'bg-indigo-500', icon: <CurrencyDollar size={20} weight="duotone" /> },
             { view: 'clientes' as ViewType, label: 'B.CLIENTES', color: 'bg-red-600', icon: <AddressBook size={20} weight="duotone" /> },
             { view: 'fornecedores' as ViewType, label: 'B.FORN', color: 'bg-emerald-600', icon: <AddressBook size={20} weight="duotone" /> },
-            { view: 'relacionamento' as ViewType, label: 'R.CLIENTES', color: 'bg-rose-600', icon: <Handshake size={20} weight="duotone" /> },
-            { view: 'relacionamento_fornecedores' as ViewType, label: 'R.FORNEC', color: 'bg-emerald-700', icon: <Handshake size={20} weight="duotone" /> },
+            { view: 'relacionamento' as ViewType, label: 'Histórico de Clientes', color: 'bg-rose-600', icon: <Handshake size={20} weight="duotone" /> },
+            { view: 'relacionamento_fornecedores' as ViewType, label: 'Histórico de Compras', color: 'bg-emerald-700', icon: <Handshake size={20} weight="duotone" /> },
             { view: 'vendas' as ViewType, label: 'Histórico', color: 'bg-cyan-700', icon: <ClockCounterClockwise size={20} weight="duotone" /> },
             { view: 'relatorios' as ViewType, label: 'Relatórios e Backup', color: 'bg-cyan-600', icon: <ChartPie size={20} weight="duotone" /> },
             { view: 'agenda' as ViewType, label: 'Agenda', color: 'bg-violet-600', icon: <CalendarBlank size={20} weight="duotone" /> },

@@ -73,24 +73,32 @@ export const RelacionamentoVendasView = ({ sales, customers, products, colors, s
     const [search, setSearch] = useState('');
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
-    const [expandedReceiptId, setExpandedReceiptId] = useState<string | null>(null);
     const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
 
     // Deep link effect
     useEffect(() => {
         if (deepLinkTarget) {
             setSelectedCustomerId(deepLinkTarget.customerId);
-            if (deepLinkTarget.type === 'sale') {
-                setExpandedSaleId(deepLinkTarget.saleId);
-            } else if (deepLinkTarget.type === 'receipt') {
-                setExpandedReceiptId(deepLinkTarget.saleId);
-            }
+            setExpandedSaleId(deepLinkTarget.saleId);
             if (onClearDeepLink) {
                 // Clear immediately so we don't re-trigger if the user manually closes it
                 onClearDeepLink();
             }
         }
     }, [deepLinkTarget, onClearDeepLink]);
+
+    // Auto-scroll when a record is expanded via deep link
+    useEffect(() => {
+        if (expandedSaleId) {
+            // Wait for render/expansion animation
+            setTimeout(() => {
+                const element = document.getElementById(`sale-${expandedSaleId}`) || document.getElementById(`receipt-${expandedSaleId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 300);
+        }
+    }, [expandedSaleId]);
 
     const [payAmount, setPayAmount] = useState<string>('');
     const [payDate, setPayDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -436,7 +444,7 @@ export const RelacionamentoVendasView = ({ sales, customers, products, colors, s
                             <HeartHandshake size={20} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black uppercase dark:text-white leading-none tracking-tight">Relacionamento</h2>
+                            <h2 className="text-xl font-black uppercase dark:text-white leading-none tracking-tight">Histórico de Clientes</h2>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestão de Créditos e Cobranças</p>
                         </div>
                     </div>
@@ -803,7 +811,7 @@ export const RelacionamentoVendasView = ({ sales, customers, products, colors, s
                                             const canReleaseNow = isAwaitingApproval && isStockReady;
 
                                             return (
-                                                <div key={s.id} className={`relative bg-white dark:bg-slate-900 border-2 dark:border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden transition-all duration-500 ${s.status === 'Cancelada' ? 'opacity-50 grayscale border-slate-100' : isExpanded ? 'border-blue-500 shadow-2xl -translate-y-1' : (canReleaseNow ? 'border-emerald-400 shadow-emerald-100 dark:shadow-none' : 'border-slate-100 hover:border-blue-200')}`}>
+                                                <div key={s.id} id={`sale-${s.id}`} className={`relative bg-white dark:bg-slate-900 border-2 dark:border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden transition-all duration-500 ${s.status === 'Cancelada' ? 'opacity-50 grayscale border-slate-100' : isExpanded ? 'border-blue-500 shadow-2xl -translate-y-1' : (canReleaseNow ? 'border-emerald-400 shadow-emerald-100 dark:shadow-none' : 'border-slate-100 hover:border-blue-200')}`}>
                                                     {/* FAIXA VERDE SE ESTIVER PRONTO */}
                                                     {canReleaseNow && !isExpanded && (
                                                         <div className="bg-emerald-500 text-white text-[10px] font-black uppercase text-center py-1.5 tracking-widest flex items-center justify-center gap-2">
@@ -1226,7 +1234,7 @@ export const RelacionamentoVendasView = ({ sales, customers, products, colors, s
                                             const progress = r.totalValue > 0 ? ((r.amountPaid || 0) / r.totalValue) * 100 : 0;
 
                                             return (
-                                                <div key={r.id} className={`relative bg-white dark:bg-slate-900 border-2 dark:border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden transition-all duration-500 ${isExpanded ? 'border-violet-500 shadow-2xl -translate-y-1' : 'border-slate-100 hover:border-violet-200'}`}>
+                                                <div key={r.id} id={`receipt-${r.id}`} className={`relative bg-white dark:bg-slate-900 border-2 dark:border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden transition-all duration-500 ${isExpanded ? 'border-violet-500 shadow-2xl -translate-y-1' : 'border-slate-100 hover:border-violet-200'}`}>
                                                     {/* Checkbox de Seleção */}
                                                     <div className="absolute top-4 right-4 z-10">
                                                         <button

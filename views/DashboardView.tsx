@@ -15,6 +15,7 @@ import { ProLaboreChart } from '../components/ProLaboreChart';
 import { ChequeControlCard } from '../components/ChequeControlCard';
 import { formatDate } from '../lib/utils';
 import { Transaction } from '../types';
+import { generateReportPDF } from '../lib/pdfGenerator';
 
 interface DashboardViewProps {
   stats: any;
@@ -85,7 +86,7 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
   const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
     const saved = localStorage.getItem('dashboard_section_order');
     const defaultOrder = [
-      'gastos_gerais', 'pagamentos_fornecedor', 'pro_labore', 'lembretes_pagamento', 'lembretes_recebimento', 'controle_cheques', 'balanco', 'estoque_consulta', 'atividades', 'patrimonio'
+      'gastos_gerais', 'pagamentos_fornecedor', 'pro_labore', 'lembretes_pagamento', 'lembretes_recebimento', 'controle_cheques', 'balanco', 'estoque_consulta', 'atividades', 'patrimonio', 'historico_consolidado'
     ];
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -128,6 +129,145 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
 
   const [isValuesBlurred, setIsValuesBlurred] = useState(false);
   const [isDashboardHidden, setIsDashboardHidden] = useState(false);
+
+  // --- Estado Histórico Consolidado ---
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyTab, setHistoryTab] = useState<'all' | 'clients' | 'purchases'>('all');
+  const [selectedHistoryItems, setSelectedHistoryItems] = useState<string[]>([]);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  const consolidatedHistory = useMemo(() => {
+    const items: any[] = [];
+
+    // Adicionar Vendas
+    sales.forEach(s => {
+      const customer = customers.find(c => c.id === s.customerId);
+      items.push({
+        id: s.id,
+        date: s.date,
+        type: 'venda',
+        title: `Venda #${s.saleNumber}`,
+        subtitle: customer?.name || 'Cliente Geral',
+        value: s.totalValue,
+        description: s.items.map(i => {
+          const product = products?.find(p => p.id === i.productId);
+          const variation = product?.variations.find(v => v.id === i.variationId);
+          const variationName = variation ? `${variation.colorId} ${variation.size}` : (i.colorId || '');
+          return `${i.quantity} ${i.isWholesale ? 'CX' : 'UN'} ${product?.name || 'Item'} (${variationName})`;
+        }).join(', '),
+        original: s,
+        entityName: customer?.name || 'Cliente Geral'
+      });
+    });
+
+    // Adicionar Recibos (Entradas de Clientes)
+    receipts.forEach(r => {
+      const customer = customers.find(c => c.id === r.customerId);
+      items.push({
+        id: r.id,
+        date: r.date,
+        type: 'recibo',
+        title: `Recibo #${r.receiptNumber}`,
+        subtitle: customer?.name || 'Cliente Geral',
+        value: r.amountPaid || 0,
+        description: r.expenseItems?.map((i: any) => i.description).join(', ') || 'Recebimento de Título',
+        status: (r.totalValue - (r.amountPaid || 0)) <= 0 ? 'Quitado' : 'Pendente',
+        original: r,
+        entityName: customer?.name || 'Cliente Geral'
+      });
+    });
+
+    // Adicionar Compras (Fornecedores)
+    purchases.forEach(p => {
+      const supplier = suppliers.find(s => s.id === p.supplierId);
+      items.push({
+        id: p.id,
+        date: p.date,
+        type: 'compra',
+        title: p.purchaseNumber ? `Compra #${p.purchaseNumber}` : 'Compra/Despesa',
+        subtitle: supplier?.name || 'Fornecedor Geral',
+        value: p.totalValue,
+        description: p.type === 'general' 
+          ? (p.expenseItems?.map((i: any) => i.description).join(', ') || p.itemDescription || 'Despesa Geral')
+          : (p.items?.map(i => {
+              const product = products?.find(prod => prod.id === i.productId);
+              return `${i.quantity}x ${product?.name || 'Item'}`;
+            }).join(', ') || 'Compra de Estoque'),
+        status: p.isPaid ? 'Quitado' : 'Pendente',
+        original: p,
+        entityName: supplier?.name || 'Fornecedor Geral'
+      });
+    });
+
+    // Ordenar por data (mais recente primeiro)
+    let filtered = items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Filtro por Data do Dashboard (Opcional, mas geralmente o dashboard já reflete isso no props)
+    // No entanto, as props sales/receipts/purchases passadas aqui já costumam ser as filtradas
+    // Se não forem, poderíamos filtrar aqui por dateRange.start/end
+
+    // Filtro por Tab
+    if (historyTab === 'clients') {
+      filtered = filtered.filter(i => i.type === 'venda' || i.type === 'recibo');
+    } else if (historyTab === 'purchases') {
+      filtered = filtered.filter(i => i.type === 'compra');
+    }
+
+    // Filtro por Busca
+    if (historySearchQuery) {
+      const q = historySearchQuery.toLowerCase();
+      filtered = filtered.filter(i => 
+        i.title.toLowerCase().includes(q) || 
+        i.subtitle.toLowerCase().includes(q) || 
+        i.description.toLowerCase().includes(q) ||
+        i.entityName.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }, [sales, receipts, purchases, customers, suppliers, products, historyTab, historySearchQuery]);
+
+  const handleExportConsolidatedPDF = async () => {
+    if (selectedHistoryItems.length === 0) return;
+    
+    setIsExportingPDF(true);
+    try {
+      const selectedData = consolidatedHistory.filter(i => selectedHistoryItems.includes(i.id));
+      
+      const columns = ['TIPO', 'DATA', 'DESCRIÇÃO', 'ENTIDADE', 'VALOR', 'SITUAÇÃO'];
+      const data = selectedData.map(i => [
+        i.type.toUpperCase(),
+        formatDate(i.date),
+        i.title + (i.description ? ` (${i.description})` : ''),
+        i.subtitle,
+        `R$ ${formatMoney(i.value)}`,
+        i.status
+      ]);
+
+      const totalValue = selectedData.reduce((acc, i) => acc + i.value, 0);
+
+      await generateReportPDF(
+        "Histórico Consolidado Musgo ERP",
+        columns,
+        data,
+        [{ label: 'TOTAL CONSOLIDADO', value: `R$ ${formatMoney(totalValue)}` }],
+        'a4',
+        `Período: ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`
+      );
+      
+      setSelectedHistoryItems([]);
+    } catch (err) {
+      console.error("Erro ao gerar PDF consolidado:", err);
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  const toggleHistorySelection = (id: string) => {
+    setSelectedHistoryItems(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
 
   const toggleSection = (id: string) => {
     setHiddenSections(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
@@ -526,8 +666,8 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             <StatBox label="Caixa Atual" value={stats.cash} icon={<CurrencyDollar size={22} weight="duotone" />} color="blue" isBlurred={isValuesBlurred} />
             <StatBox label="Estoque" value={stats.stockCost} icon={<Package size={22} weight="duotone" />} color="indigo" onClick={() => setView('estoque')} isBlurred={isValuesBlurred} />
-            <StatBox label="A Receber" value={stats.receivable} icon={<ArrowSquareUpRight size={22} weight="duotone" />} color="emerald" onClick={() => setView('relacionamento')} isBlurred={isValuesBlurred} />
-            <StatBox label="A Pagar" value={stats.payable} icon={<ArrowSquareDownLeft size={22} weight="duotone" />} color="rose" isBlurred={isValuesBlurred} />
+            <StatBox label="Histórico de Clientes" value={stats.receivable} icon={<ArrowSquareUpRight size={22} weight="duotone" />} color="emerald" onClick={() => onNavigateToSaleOrReceipt ? onNavigateToSaleOrReceipt('', '', 'sale') : setView('relacionamento')} isBlurred={isValuesBlurred} />
+            <StatBox label="Histórico de Compras" value={stats.payable} icon={<ArrowSquareDownLeft size={22} weight="duotone" />} color="rose" onClick={() => onNavigateToPurchase ? onNavigateToPurchase('', '') : setView('relacionamento_fornecedores')} isBlurred={isValuesBlurred} />
           </div>
 
           {/* Alerta de Pedidos Pendentes */}

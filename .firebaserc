@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "erp-controle-de-vendas-musgo"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

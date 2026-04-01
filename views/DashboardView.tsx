@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Sale, Customer, Purchase, Supplier, ExpenseCategory, Receipt, Product, AppGrid, AppColor } from '../types';
+import { Sale, Customer, Purchase, Supplier, ExpenseCategory, Receipt, Product, AppGrid, AppColor, SaleStatus } from '../types';
 import { StatBox } from '../components/StatBox';
 import { formatMoney } from '../lib/utils';
 import { CategoryBarChart } from '../components/CategoryBarChart';
 import { db } from '../services/api';
-import { collection, getDocs, limit, query } from 'firebase/firestore';
+import { collection, getDocs, limit, query, doc, updateDoc } from 'firebase/firestore';
 import {
   CurrencyDollar, Package, ArrowSquareUpRight, ArrowSquareDownLeft,
-  Lightning, ShoppingCart, ArrowsClockwise, Clock, WarningCircle, Truck, ChartPie, Calendar, CaretDown, Eye, EyeSlash, ChartBar, CheckCircle, CaretUp, MagnifyingGlass
+  Lightning, ShoppingCart, ArrowsClockwise, Clock, WarningCircle, Truck, ChartPie, Calendar, CaretDown, Eye, EyeSlash, ChartBar, CheckCircle, CaretUp, MagnifyingGlass, FilePdf
 } from '@phosphor-icons/react';
 import { CategoryComparisonChart } from '../components/CategoryComparisonChart';
 import { SupplierPaymentChart } from '../components/SupplierPaymentChart';
@@ -30,14 +30,33 @@ interface DashboardViewProps {
   bankAccounts: any[]; // Incluindo bankAccounts
   onNavigateToPurchase?: (supplierId: string, purchaseId: string) => void;
   onNavigateToSaleOrReceipt?: (customerId: string, id: string, type: 'sale' | 'receipt') => void;
+  onUpdateSaleStatus?: (id: string, status: SaleStatus) => Promise<void>;
+  onUpdateReceiptStatus?: (id: string, status: string) => Promise<void>;
+  onUpdateChequeStatus?: (id: string, isPaid: boolean) => Promise<void>;
   products?: Product[];
   grids?: AppGrid[];
   colors?: AppColor[];
 }
 
-export const DashboardView = ({ stats, setView, sales, customers, purchases, suppliers, categories, receipts, transactions, bankAccounts, onNavigateToPurchase, onNavigateToSaleOrReceipt, products, grids, colors }: DashboardViewProps) => {
+export const DashboardView = ({
+  stats, setView, sales, customers, purchases, suppliers, categories, receipts, transactions, bankAccounts,
+  onNavigateToPurchase, onNavigateToSaleOrReceipt, products, grids, colors,
+  onUpdateSaleStatus, onUpdateReceiptStatus, onUpdateChequeStatus
+}: DashboardViewProps) => {
   const [connStatus, setConnStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [lastError, setLastError] = useState<string | null>(null);
+
+  const handleStatusChange = async (id: string, type: string, newStatus: SaleStatus) => {
+    try {
+      if (type === 'venda' && onUpdateSaleStatus) {
+        await onUpdateSaleStatus(id, newStatus);
+      } else if (type === 'recibo' && onUpdateReceiptStatus) {
+        await onUpdateReceiptStatus(id, newStatus);
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar status:', err);
+    }
+  };
 
   // Filtros de Contas Bancárias
   const allRealAccountIds = useMemo(() => {
@@ -135,6 +154,14 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
   const [historyTab, setHistoryTab] = useState<'all' | 'clients' | 'purchases'>('all');
   const [selectedHistoryItems, setSelectedHistoryItems] = useState<string[]>([]);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isHistoryMinimized, setIsHistoryMinimized] = useState(() => {
+    const saved = localStorage.getItem('dashboard_history_minimized');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('dashboard_history_minimized', JSON.stringify(isHistoryMinimized));
+  }, [isHistoryMinimized]);
 
   const consolidatedHistory = useMemo(() => {
     const items: any[] = [];
@@ -149,29 +176,50 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
         title: `Venda #${s.saleNumber}`,
         subtitle: customer?.name || 'Cliente Geral',
         value: s.totalValue,
-        description: s.items.map(i => {
-          const product = products?.find(p => p.id === i.productId);
-          const variation = product?.variations.find(v => v.id === i.variationId);
-          const variationName = variation ? `${variation.colorId} ${variation.size}` : (i.colorId || '');
-          return `${i.quantity} ${i.isWholesale ? 'CX' : 'UN'} ${product?.name || 'Item'} (${variationName})`;
-        }).join(', '),
+        status: s.isPaid ? 'Quitado' : (s.amountPaid > 0 ? 'Parcial' : (s.status === 'Cancelada' ? 'Cancelada' : 'Pendente')),
+        operationalStatus: s.status || 'Pendente',
+        pendingValue: Math.max(0, s.totalValue - (s.amountPaid || 0)),
+        description: [
+          s.items.map(i => {
+            const product = products?.find(p => p.id === i.productId);
+            let detail = '';
+            if (i.isWholesale) {
+              const grid = grids?.find(g => g.id === (product as any)?.gridId || (product as any)?.gridIds?.[0]);
+              detail = `${i.quantity} CX ${product?.name || 'Item'}${grid ? ` (Grade ${grid.name})` : ''}`;
+            } else {
+              const variation = product?.variations.find(v => v.id === i.variationId);
+              const colorName = colors?.find(c => c.id === variation?.colorId || i.colorId)?.name || variation?.colorId || i.colorId || '';
+              const size = variation?.size || '';
+              detail = `${i.quantity} UN ${product?.name || 'Item'} (${colorName}${size ? ` ${size}` : ''})`;
+            }
+            return detail;
+          }).join(', '),
+          s.comments
+        ].filter(Boolean).join(' | '),
         original: s,
         entityName: customer?.name || 'Cliente Geral'
       });
     });
 
-    // Adicionar Recibos (Entradas de Clientes)
     receipts.forEach(r => {
       const customer = customers.find(c => c.id === r.customerId);
+      const amountPaid = r.amountPaid || 0;
+      const totalValue = r.totalValue || 0;
       items.push({
         id: r.id,
         date: r.date,
         type: 'recibo',
         title: `Recibo #${r.receiptNumber}`,
         subtitle: customer?.name || 'Cliente Geral',
-        value: r.amountPaid || 0,
-        description: r.expenseItems?.map((i: any) => i.description).join(', ') || 'Recebimento de Título',
-        status: (r.totalValue - (r.amountPaid || 0)) <= 0 ? 'Quitado' : 'Pendente',
+        value: r.totalValue || 0,
+        description: [
+          r.expenseItems?.map((i: any) => i.description).join(', '),
+          r.itemDescription,
+          r.notes
+        ].filter(Boolean).join(' | ') || 'Recebimento de Título',
+        status: r.isPaid || (totalValue - amountPaid) <= 0 ? 'Quitado' : (amountPaid > 0 ? 'Parcial' : 'Pendente'),
+        operationalStatus: r.status || 'Pendente',
+        pendingValue: Math.max(0, totalValue - amountPaid),
         original: r,
         entityName: customer?.name || 'Cliente Geral'
       });
@@ -180,6 +228,23 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
     // Adicionar Compras (Fornecedores)
     purchases.forEach(p => {
       const supplier = suppliers.find(s => s.id === p.supplierId);
+      
+      let description = '';
+      if (p.type === 'general') {
+        const parts = [
+          p.expenseItems?.map((i: any) => i.description).join(', '),
+          p.itemDescription,
+          p.notes
+        ].filter(Boolean);
+        description = parts.join(' | ') || 'Despesa Geral';
+      } else {
+        description = p.items?.map(i => {
+          const product = products?.find(prod => prod.id === i.productId);
+          return `${i.quantity}x ${product?.name || 'Item'}`;
+        }).join(', ') || 'Compra de Estoque';
+        if (p.notes) description += ` | ${p.notes}`;
+      }
+
       items.push({
         id: p.id,
         date: p.date,
@@ -187,13 +252,10 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
         title: p.purchaseNumber ? `Compra #${p.purchaseNumber}` : 'Compra/Despesa',
         subtitle: supplier?.name || 'Fornecedor Geral',
         value: p.totalValue,
-        description: p.type === 'general' 
-          ? (p.expenseItems?.map((i: any) => i.description).join(', ') || p.itemDescription || 'Despesa Geral')
-          : (p.items?.map(i => {
-              const product = products?.find(prod => prod.id === i.productId);
-              return `${i.quantity}x ${product?.name || 'Item'}`;
-            }).join(', ') || 'Compra de Estoque'),
-        status: p.isPaid ? 'Quitado' : 'Pendente',
+        status: p.isPaid ? 'Quitado' : (p.amountPaid > 0 ? 'Parcial' : 'Pendente'),
+        operationalStatus: p.status || 'Pendente',
+        pendingValue: Math.max(0, p.totalValue - (p.amountPaid || 0)),
+        description: description,
         original: p,
         entityName: supplier?.name || 'Fornecedor Geral'
       });
@@ -234,14 +296,15 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
     try {
       const selectedData = consolidatedHistory.filter(i => selectedHistoryItems.includes(i.id));
       
-      const columns = ['TIPO', 'DATA', 'DESCRIÇÃO', 'ENTIDADE', 'VALOR', 'SITUAÇÃO'];
+      const columns = ['TIPO', 'DATA', 'DESCRIÇÃO', 'ENTIDADE', 'VALOR', 'FINANCEIRO', 'LOGÍSTICA'];
       const data = selectedData.map(i => [
         i.type.toUpperCase(),
         formatDate(i.date),
-        i.title + (i.description ? ` (${i.description})` : ''),
-        i.subtitle,
+        i.title + (i.description ? `\n${i.description}` : ''),
+        i.entityName,
         `R$ ${formatMoney(i.value)}`,
-        i.status
+        i.status,
+        i.operationalStatus
       ]);
 
       const totalValue = selectedData.reduce((acc, i) => acc + i.value, 0);
@@ -562,19 +625,22 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
           <div className="flex items-center gap-3">
             <h2 className="text-2xl sm:text-3xl font-black uppercase dark:text-white tracking-tight leading-none">Painel de Controle</h2>
             <button
-              onClick={() => setIsValuesBlurred(!isValuesBlurred)}
-              className="p-1.5 sm:p-2 text-slate-400 hover:text-blue-600 bg-white dark:bg-slate-800 border-2 dark:border-slate-700 rounded-xl transition-all shadow-sm"
-              title={isValuesBlurred ? 'Mostrar Valores' : 'Ocultar Valores'}
-            >
-              {isValuesBlurred ? <EyeSlash size={20} weight="bold" /> : <Eye size={20} weight="bold" />}
-            </button>
-            <button
               onClick={() => setIsDashboardHidden(!isDashboardHidden)}
               className="p-1.5 sm:p-2 text-slate-400 hover:text-rose-600 bg-white dark:bg-slate-800 border-2 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
               title={isDashboardHidden ? 'Mostrar Painel' : 'Ocultar Painel Inteiro'}
             >
               {isDashboardHidden ? <Eye size={20} weight="bold" /> : <EyeSlash size={20} weight="bold" />}
             </button>
+            {hiddenSections.length > 0 && (
+              <button
+                onClick={() => setHiddenSections([])}
+                className="p-1.5 sm:p-2 text-indigo-400 hover:text-indigo-600 bg-white dark:bg-slate-800 border-2 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                title="Restaurar Seções Ocultas"
+              >
+                <ArrowsClockwise size={20} weight="bold" />
+                <span className="text-[10px] font-black uppercase pr-1 hidden sm:inline">Restaurar</span>
+              </button>
+            )}
           </div>
           <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 mt-1.5 uppercase tracking-widest">Resumo Operacional</p>
         </div>
@@ -664,10 +730,10 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
 
           {/* Estatísticas 2x2 mobile / 4col desktop */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-            <StatBox label="Caixa Atual" value={stats.cash} icon={<CurrencyDollar size={22} weight="duotone" />} color="blue" isBlurred={isValuesBlurred} />
-            <StatBox label="Estoque" value={stats.stockCost} icon={<Package size={22} weight="duotone" />} color="indigo" onClick={() => setView('estoque')} isBlurred={isValuesBlurred} />
-            <StatBox label="Histórico de Clientes" value={stats.receivable} icon={<ArrowSquareUpRight size={22} weight="duotone" />} color="emerald" onClick={() => onNavigateToSaleOrReceipt ? onNavigateToSaleOrReceipt('', '', 'sale') : setView('relacionamento')} isBlurred={isValuesBlurred} />
-            <StatBox label="Histórico de Compras" value={stats.payable} icon={<ArrowSquareDownLeft size={22} weight="duotone" />} color="rose" onClick={() => onNavigateToPurchase ? onNavigateToPurchase('', '') : setView('relacionamento_fornecedores')} isBlurred={isValuesBlurred} />
+            <StatBox label="Caixa Atual" value={stats.cash} icon={<CurrencyDollar size={22} weight="duotone" />} color="blue" />
+            <StatBox label="Estoque" value={stats.stockCost} icon={<Package size={22} weight="duotone" />} color="indigo" onClick={() => setView('estoque')} />
+            <StatBox label="Total em Aberto (Vendas + Entradas)" value={stats.receivable} icon={<ArrowSquareUpRight size={22} weight="duotone" />} color="emerald" onClick={() => onNavigateToSaleOrReceipt ? onNavigateToSaleOrReceipt('', '', 'sale') : setView('relacionamento')} />
+            <StatBox label="Histórico de Compras" value={stats.payable} icon={<ArrowSquareDownLeft size={22} weight="duotone" />} color="rose" onClick={() => onNavigateToPurchase ? onNavigateToPurchase('', '') : setView('relacionamento_fornecedores')} />
           </div>
 
           {/* Alerta de Pedidos Pendentes */}
@@ -755,6 +821,7 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
                       suppliers={suppliers}
                       purchases={purchases}
                       onHide={() => toggleSection('controle_cheques')}
+                      onToggleStatus={onUpdateChequeStatus}
                     />,
                     sectionId
                   );
@@ -1039,6 +1106,184 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
                     sectionId
                   );
 
+                case 'historico_consolidado':
+                  return withControls(
+                    <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2rem] p-5 sm:p-8 shadow-sm flex flex-col h-full overflow-hidden transition-all col-span-1 lg:col-span-2">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-xs font-black uppercase text-indigo-500 tracking-widest flex items-center gap-2">
+                            <ArrowsClockwise size={18} weight="duotone" /> Histórico Consolidado
+                          </h3>
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <button
+                              onClick={() => toggleSection('historico_consolidado')}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all active:scale-95"
+                              title="Ocultar Seção"
+                            >
+                              <EyeSlash size={16} weight="bold" />
+                            </button>
+                            <button
+                              onClick={() => setIsHistoryMinimized(!isHistoryMinimized)}
+                              className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all active:scale-95"
+                              title={isHistoryMinimized ? "Expandir" : "Minimizar"}
+                            >
+                              {isHistoryMinimized ? <CaretDown size={16} weight="bold" /> : <CaretUp size={16} weight="bold" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto relative z-20">
+                          <div className="relative w-full sm:w-64">
+                            <input
+                              type="text"
+                              placeholder="BUSCAR PESSOA/PEDIDO..."
+                              value={historySearchQuery}
+                              onChange={(e) => setHistorySearchQuery(e.target.value)}
+                              className="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
+                            />
+                            <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          </div>
+
+                          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
+                            <button 
+                              onClick={() => setHistoryTab('all')}
+                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${historyTab === 'all' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                            >
+                              Tudo
+                            </button>
+                            <button 
+                              onClick={() => setHistoryTab('clients')}
+                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${historyTab === 'clients' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                            >
+                              Clientes
+                            </button>
+                            <button 
+                              onClick={() => setHistoryTab('purchases')}
+                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${historyTab === 'purchases' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                            >
+                              Compras
+                            </button>
+                          </div>
+
+                          {selectedHistoryItems.length > 0 && (
+                            <button
+                              onClick={handleExportConsolidatedPDF}
+                              disabled={isExportingPDF}
+                              className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+                            >
+                              {isExportingPDF ? <ArrowsClockwise size={14} className="animate-spin" /> : <FilePdf size={14} weight="bold" />}
+                              Gerar PDF ({selectedHistoryItems.length})
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isHistoryMinimized ? (
+                        <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[500px] pr-2 relative z-20">
+                          <div className="space-y-2">
+                            {consolidatedHistory.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center p-12 text-slate-400 opacity-50">
+                                <Clock size={48} weight="duotone" className="mb-4" />
+                                <p className="text-[10px] font-black uppercase tracking-widest text-center">Nenhum registro encontrado</p>
+                              </div>
+                            ) : (
+                              consolidatedHistory.map((item) => (
+                                <div 
+                                  key={item.id}
+                                  className={`group flex items-center gap-3 p-3 rounded-2xl border-2 transition-all hover:scale-[1.01] ${selectedHistoryItems.includes(item.id) ? 'bg-indigo-50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-900/30 shadow-md' : 'bg-slate-50 dark:bg-slate-800/40 border-transparent hover:border-slate-200 dark:hover:border-slate-700'}`}
+                                >
+                                  <button 
+                                    onClick={() => toggleHistorySelection(item.id)}
+                                    className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedHistoryItems.includes(item.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600'}`}
+                                  >
+                                    {selectedHistoryItems.includes(item.id) && <CheckCircle size={12} weight="bold" />}
+                                  </button>
+
+                                  <div 
+                                    className="flex-1 cursor-pointer"
+                                    onClick={() => {
+                                      if (item.type === 'compra') {
+                                        onNavigateToPurchase ? onNavigateToPurchase(item.original.supplierId, item.id) : setView('relacionamento_fornecedores');
+                                      } else {
+                                        onNavigateToSaleOrReceipt ? onNavigateToSaleOrReceipt(item.original.customerId, item.id, item.type === 'venda' ? 'sale' : 'receipt') : setView('relacionamento');
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex justify-between items-start mb-1">
+                                      <div className="flex items-center gap-2">
+                                        <div className={`p-1.5 rounded-lg ${item.type === 'venda' ? 'bg-blue-100 text-blue-600' : item.type === 'recibo' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                          {item.type === 'venda' ? <ShoppingCart size={12} weight="bold" /> : item.type === 'recibo' ? <ArrowSquareDownLeft size={12} weight="bold" /> : <ArrowSquareUpRight size={12} weight="bold" />}
+                                        </div>
+                                        <div>
+                                          <h4 className="text-[11px] font-black uppercase dark:text-white leading-none">{item.title}</h4>
+                                          <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{item.subtitle}</p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className={`text-xs font-black sm:text-sm ${item.type === 'recibo' ? 'text-emerald-500' : item.type === 'venda' ? 'text-blue-600' : 'text-rose-500'}`}>
+                                          {item.type === 'compra' ? '-' : ''} R$ {formatMoney(item.value)}
+                                        </p>
+                                        <p className="text-[8px] font-black text-slate-400 mt-0.5">{formatDate(item.date)}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex justify-between items-center gap-4">
+                                      <p className="text-[9px] text-slate-500 dark:text-slate-400 line-clamp-1 italic flex-1">
+                                        {item.description}
+                                      </p>
+                                      {item.pendingValue > 0 && (
+                                        <span className="text-[9px] font-black text-rose-500 whitespace-nowrap">
+                                          Pendente: R$ {formatMoney(item.pendingValue)}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                      <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase ${item.status === 'Quitado' || item.status === 'Entregue' ? 'bg-emerald-100 text-emerald-600' : item.status === 'Cancelada' ? 'bg-rose-100 text-rose-600' : item.status === 'Parcial' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
+                                        FIN: {item.status}
+                                      </span>
+                                      
+                                      {item.type !== 'compra' ? (
+                                        <select
+                                          title="Status Operacional"
+                                          value={item.operationalStatus}
+                                          onChange={(e) => handleStatusChange(item.id, item.type, e.target.value as SaleStatus)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase outline-none border-none cursor-pointer ${item.operationalStatus === 'Entregue' || item.operationalStatus === 'Coletado' ? 'bg-emerald-100 text-emerald-600' : item.operationalStatus === 'Cancelada' ? 'bg-rose-100 text-rose-600' : item.operationalStatus === 'Pendente' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}
+                                        >
+                                          <option value="Pendente">OP: Pendente</option>
+                                          <option value="Aguardando Aprovação">OP: Aguardando Aprov.</option>
+                                          <option value="Aguardando Estoque">OP: Aguardando Estoq.</option>
+                                          <option value="Aguardando Rota">OP: Aguardando Rota</option>
+                                          <option value="Em produção">OP: Em produção</option>
+                                          <option value="Coletado">OP: Coletado</option>
+                                          <option value="Entregue">OP: Entregue</option>
+                                          <option value="Cancelada">OP: Cancelada</option>
+                                        </select>
+                                      ) : (
+                                        <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase ${item.operationalStatus === 'Entregue' || item.operationalStatus === 'Coletado' ? 'bg-emerald-100 text-emerald-600' : item.operationalStatus === 'Cancelada' ? 'bg-rose-100 text-rose-600' : item.operationalStatus === 'Pendente' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                          OP: {item.operationalStatus}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setIsHistoryMinimized(false)}
+                          className="flex-1 flex items-center justify-center text-[10px] font-black uppercase text-indigo-500 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl py-6 cursor-pointer relative z-20 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-all"
+                        >
+                          Visualizar Histórico Consolidado
+                        </button>
+                      )}
+                    </div>,
+                    sectionId
+                  );
+
                 case 'atividades':
                   return withControls(
                     <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2rem] p-5 sm:p-8 shadow-sm overflow-hidden h-full">
@@ -1078,7 +1323,7 @@ export const DashboardView = ({ stats, setView, sales, customers, purchases, sup
 
                       <div className="relative z-10">
                         <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">Patrimônio Estimado</p>
-                        <h4 className={`text-3xl sm:text-4xl font-black tracking-tight mb-6 sm:mb-8 transition-all duration-300 ${isValuesBlurred ? 'blur-lg select-none opacity-50' : ''}`}>R$ {formatMoney(stats.netWorth)}</h4>
+                        <h4 className="text-3xl sm:text-4xl font-black tracking-tight mb-6 sm:mb-8 transition-all duration-300">R$ {formatMoney(stats.netWorth)}</h4>
 
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div className="p-3 sm:p-4 bg-white/5 rounded-2xl border border-white/10">

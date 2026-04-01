@@ -206,6 +206,7 @@ export interface Purchase {
   bankAccountId?: string;
   categoryId?: string;
   cheques?: Cheque[];
+  status?: SaleStatus;
 }
 
 export interface Cheque {
@@ -242,6 +243,7 @@ export interface Receipt {
   accounted?: boolean;
   bankAccountId?: string;
   categoryId?: string;
+  status?: SaleStatus;
 }
 
 export interface AccountEntry {

@@ -449,17 +449,17 @@ export const RelacionamentoVendasView = ({ sales, customers, products, colors, s
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                        {/* SEARCH INPUT INTENTIONAL PLACEMENT */}
-                        <div onClick={e => e.stopPropagation()} className="relative flex-1 sm:w-64">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <div onClick={e => e.stopPropagation()} className="relative w-full sm:w-64">
+                            <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input
                                 title="Pesquisar Cliente" aria-label="Pesquisar Cliente"
-                                type="text" placeholder="PESQUISAR CLIENTE..." value={search} onChange={e => setSearch(e.target.value)}
+                                type="text" placeholder="BUSCAR PESSOA/PEDIDO..." value={search} onChange={e => setSearch(e.target.value)}
                                 className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-[1.5rem] pl-12 pr-4 py-3 text-[10px] font-black uppercase outline-none focus:ring-2 ring-blue-500/20 shadow-inner"
                             />
                         </div>
                         <button
+                            onClick={e => { e.stopPropagation(); setIsHeaderExpanded(!isHeaderExpanded); }}
                             title={isHeaderExpanded ? "Recolher" : "Expandir"}
                             aria-label={isHeaderExpanded ? "Recolher Resumo" : "Expandir Resumo"}
                             className="p-2 text-slate-400 hover:text-blue-500 transition-colors"

@@ -18,5 +18,13 @@
         "destination": "/index.html"
       }
     ]
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Calculadora Preço PRO",
+        "supportEmail": "tiagoaugusto.ns@gmail.com"
+      }
+    }
   }
 }

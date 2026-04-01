@@ -1,10 +1,10 @@
 // hooks/useAppData.ts
 import { useState, useEffect, useCallback } from 'react';
-import { Product, Customer, Supplier, Sale, AccountEntry, Transaction, Purchase, Receipt, AgendaTask, AppNote, AppColor, AppUnit, AppGrid, ExpenseCategory, FamilyMember, PersonalCategory, PersonalBudget, PersonalTransaction, BankAccount, AccountTransfer } from '../types';
+import { Product, Customer, Supplier, Sale, AccountEntry, Transaction, Purchase, Receipt, AgendaTask, AppNote, AppColor, AppUnit, AppGrid, ExpenseCategory, FamilyMember, PersonalCategory, PersonalBudget, PersonalTransaction, BankAccount, AccountTransfer, Cheque } from '../types';
 import { generateId, sanitizeBankAccountId } from '../lib/utils';
 import { bankAccountService } from '../services/bankAccountService';
 import { db } from '../services/api';
-import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { productService } from '../services/productService';
 import { customerService } from '../services/customerService';
 import { supplierService } from '../services/supplierService';
@@ -41,6 +41,7 @@ export const useAppData = () => {
     const [showMiniatures, setShowMiniatures] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [cheques, setCheques] = useState<Cheque[]>([]);
 
     const syncData = useCallback(async () => {
         setIsLoading(true);
@@ -54,7 +55,7 @@ export const useAppData = () => {
                 }
             };
 
-            const [p, c, s, col, u, g, cat, sa, f, t, pur, rece, tsk, n, pFam, pCat, pBud, pTrans, ba] = await Promise.all([
+            const [p, c, s, col, u, g, cat, sa, f, t, pur, rece, tsk, n, pFam, pCat, pBud, pTrans, ba, chq] = await Promise.all([
                 safeFetch(() => productService.getProducts(), 'produtos'),
                 safeFetch(() => customerService.getCustomers(), 'clientes'),
                 safeFetch(() => supplierService.getSuppliers(), 'fornecedores'),
@@ -74,6 +75,10 @@ export const useAppData = () => {
                 safeFetch(() => personalFinanceService.getBudgets(), 'personal_budgets'),
                 safeFetch(() => personalFinanceService.getTransactions(), 'personal_transactions'),
                 safeFetch(() => bankAccountService.getAccounts(), 'bank_accounts'),
+                safeFetch(async () => {
+                   const snap = await getDocs(collection(db, 'cheques'));
+                   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Cheque));
+                }, 'cheques'),
             ]);
 
             setProducts(p);
@@ -95,6 +100,7 @@ export const useAppData = () => {
             setPersonalBudgets(pBud);
             setPersonalTransactions(pTrans);
             setBankAccounts(ba);
+            setCheques(chq);
 
             console.log('✅ Dados carregados com sucesso (Firebase).');
         } catch (err) {
@@ -742,6 +748,34 @@ export const useAppData = () => {
                 reader.onerror = () => reject(new Error("Erro ao ler arquivo"));
                 reader.readAsText(file);
             }),
+
+            updateSaleStatus: async (saleId: string, status: any) => withSaving(async () => {
+                const sale = sales.find(s => s.id === saleId);
+                if (!sale) return;
+                await saleService.updateSale({ ...sale, status });
+                const [updSales, updProds] = await Promise.all([
+                    saleService.getSales(),
+                    productService.getProducts()
+                ]);
+                setSales(updSales);
+                setProducts(updProds);
+            }),
+
+            updateReceiptStatus: async (receiptId: string, status: any) => withSaving(async () => {
+                await updateDoc(doc(db, 'receipts', receiptId), { status });
+                const updReceipts = await receiptService.getReceipts();
+                setReceipts(updReceipts);
+            }),
+
+            updateChequeStatus: async (chequeId: string, isPaid: boolean) => withSaving(async () => {
+                await updateDoc(doc(db, 'cheques', chequeId), { isPaid });
+                const snap = await getDocs(collection(db, 'cheques'));
+                const chqs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Cheque));
+                setCheques(chqs);
+                const updPurchases = await purchaseService.getPurchases();
+                setPurchases(updPurchases);
+            }),
+
             exportData: () => {
                 const str = JSON.stringify(getRawData());
                 const blob = new Blob([str], { type: 'application/json' });

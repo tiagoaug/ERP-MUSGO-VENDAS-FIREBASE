@@ -18,6 +18,7 @@ const buildReceipt = (row: any, id: string, items: any[], expenseItems: any[], p
     isPaid: row.is_paid,
     itemDescription: row.item_description,
     notes: row.notes,
+    status: row.status || 'Pendente',
     accounted: row.accounted ?? true,
     bankAccountId: row.bank_account_id,
     items: items.filter(i => i.receipt_id === id).map(i => ({
@@ -71,6 +72,7 @@ export const receiptService = {
             is_paid: !!receipt.isPaid,
             item_description: receipt.itemDescription || null,
             notes: receipt.notes || null,
+            status: receipt.status || 'Pendente',
             accounted: receipt.accounted ?? true,
             bank_account_id: sanitizeBankAccountId(receipt.bankAccountId) || null,
         }));
@@ -138,6 +140,7 @@ export const receiptService = {
             is_paid: receipt.isPaid,
             item_description: receipt.itemDescription,
             notes: receipt.notes,
+            status: receipt.status || 'Pendente',
             accounted: receipt.accounted ?? true,
             bank_account_id: sanitizeBankAccountId(receipt.bankAccountId) || null,
         }));

@@ -3,17 +3,27 @@ import React, { useState, useMemo } from 'react';
 import { Cheque, Supplier, Purchase } from '../types';
 import { formatMoney, formatDate } from '../lib/utils';
 import { MagnifyingGlass, FileText, Calendar, WarningCircle, CheckCircle, EyeSlash } from '@phosphor-icons/react';
+import { db } from '../services/api';
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface ChequeControlCardProps {
     cheques: Cheque[];
     suppliers: Supplier[];
     purchases: Purchase[];
     onHide: () => void;
+    onToggleStatus?: (id: string, isPaid: boolean) => Promise<void>;
 }
 
-export const ChequeControlCard = ({ cheques, suppliers, purchases, onHide }: ChequeControlCardProps) => {
+export const ChequeControlCard = ({ cheques, suppliers, purchases, onHide, onToggleStatus }: ChequeControlCardProps) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'paid'>('all');
+
+    const handleToggleStatus = async (chequeId: string, currentStatus: boolean, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onToggleStatus) {
+            await onToggleStatus(chequeId, !currentStatus);
+        }
+    };
 
     const filteredCheques = useMemo(() => {
         return cheques.filter(c => {
@@ -115,14 +125,23 @@ export const ChequeControlCard = ({ cheques, suppliers, purchases, onHide }: Che
                                     </p>
                                 </div>
                             </div>
-                            <div className={`px-3 py-1.5 rounded-lg border flex items-center justify-between ${maturity.bgColor}`}>
+                            <div className={`px-3 py-1.5 rounded-lg border flex items-center justify-between mt-2 ${maturity.bgColor}`}>
                                 <div className="flex items-center gap-2">
                                     <Calendar size={12} weight="bold" className={maturity.color} />
                                     <span className={`text-[9px] font-black uppercase ${maturity.color}`}>{maturity.label}</span>
                                 </div>
-                                {!c.isPaid && (
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Vecto: {formatDate(c.dueDate)}</span>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {!c.isPaid && (
+                                        <span className="text-[8px] font-bold text-slate-400 uppercase mr-2">Vecto: {formatDate(c.dueDate)}</span>
+                                    )}
+                                    <button
+                                        title={c.isPaid ? 'Marcar como Pendente' : 'Marcar como Quitado'}
+                                        onClick={(e) => handleToggleStatus(c.id, c.isPaid, e)}
+                                        className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all shadow-sm ${c.isPaid ? 'bg-white border focus:ring-amber-500 border-amber-200 text-amber-600 hover:bg-amber-50' : 'bg-white border focus:ring-emerald-500 border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+                                    >
+                                        {c.isPaid ? 'Reverter para Pendente' : 'Quitar Cheque'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     );

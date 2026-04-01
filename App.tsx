@@ -68,7 +68,7 @@ const App: React.FC = () => {
     const stockCost = (data.bankAccounts || []).find(a => a.id === 'estoque-virtual')?.balance || 0;
 
     const receivableSales = (data.sales || []).filter(s => !s.isPaid && s.status !== 'Cancelada').reduce((acc, s) => acc + (s.totalValue - s.amountPaid), 0);
-    const receivableReceipts = (data.receipts || []).filter(r => !r.isPaid).reduce((acc, r) => acc + (r.totalValue - (r.amountPaid || 0)), 0);
+    const receivableReceipts = (data.receipts || []).filter(r => !r.isPaid && (r.accounted ?? true)).reduce((acc, r) => acc + (r.totalValue - (r.amountPaid || 0)), 0);
     const receivable = receivableSales + receivableReceipts;
     const payable = (data.purchases || []).filter(p => !p.isPaid && (p.accounted ?? true)).reduce((acc, p) => acc + (p.totalValue - (p.amountPaid || 0)), 0);
 
@@ -173,6 +173,9 @@ const App: React.FC = () => {
         products={data.products}
         grids={data.grids}
         colors={data.colors}
+        onUpdateSaleStatus={actions.updateSaleStatus}
+        onUpdateReceiptStatus={actions.updateReceiptStatus}
+        onUpdateChequeStatus={actions.updateChequeStatus}
       />;
       case 'estoque': return <EstoqueView products={data.products} colors={data.colors} showMiniatures={data.showMiniatures} onUpdateProduct={actions.addProduct} onRecalculate={actions.recalculateStock} setView={handleNavigation} />;
       case 'produtos': return <ProdutosView suppliers={data.suppliers} grids={data.grids} colors={data.colors} showMiniatures={data.showMiniatures} onToggleMiniatures={actions.setShowMiniatures} onRequestPurchase={handlePurchaseFromSupplier} />;

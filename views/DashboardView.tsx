@@ -7,7 +7,7 @@ import { db } from '../services/api';
 import { collection, getDocs, limit, query, doc, updateDoc } from 'firebase/firestore';
 import {
   CurrencyDollar, Package, ArrowSquareUpRight, ArrowSquareDownLeft,
-  Lightning, ShoppingCart, ArrowsClockwise, Clock, WarningCircle, Truck, ChartPie, Calendar, CaretDown, Eye, EyeSlash, ChartBar, CheckCircle, CaretUp, MagnifyingGlass, FilePdf
+  Lightning, ShoppingCart, ArrowsClockwise, Clock, WarningCircle, Truck, ChartPie, Calendar, CaretDown, Eye, EyeSlash, ChartBar, CheckCircle, CaretUp, MagnifyingGlass, FilePdf, CheckSquare, X
 } from '@phosphor-icons/react';
 import { CategoryComparisonChart } from '../components/CategoryComparisonChart';
 import { SupplierPaymentChart } from '../components/SupplierPaymentChart';
@@ -290,11 +290,15 @@ export const DashboardView = ({
   }, [sales, receipts, purchases, customers, suppliers, products, historyTab, historySearchQuery]);
 
   const handleExportConsolidatedPDF = async () => {
-    if (selectedHistoryItems.length === 0) return;
+    const dataToExport = selectedHistoryItems.length > 0 
+      ? consolidatedHistory.filter(i => selectedHistoryItems.includes(i.id))
+      : consolidatedHistory;
+
+    if (dataToExport.length === 0) return;
     
     setIsExportingPDF(true);
     try {
-      const selectedData = consolidatedHistory.filter(i => selectedHistoryItems.includes(i.id));
+      const selectedData = dataToExport;
       
       const columns = ['TIPO', 'DATA', 'DESCRIÇÃO', 'ENTIDADE', 'VALOR', 'FINANCEIRO', 'LOGÍSTICA'];
       const data = selectedData.map(i => [
@@ -330,6 +334,14 @@ export const DashboardView = ({
     setSelectedHistoryItems(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
+  };
+
+  const toggleSelectAllHistory = () => {
+    if (selectedHistoryItems.length === consolidatedHistory.length && consolidatedHistory.length > 0) {
+      setSelectedHistoryItems([]);
+    } else {
+      setSelectedHistoryItems(consolidatedHistory.map(item => item.id));
+    }
   };
 
   const toggleSection = (id: string) => {
@@ -1132,48 +1144,69 @@ export const DashboardView = ({
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto relative z-20">
-                          <div className="relative w-full sm:w-64">
-                            <input
-                              type="text"
-                              placeholder="BUSCAR PESSOA/PEDIDO..."
-                              value={historySearchQuery}
-                              onChange={(e) => setHistorySearchQuery(e.target.value)}
-                              className="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
-                            />
-                            <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <div className="flex flex-col gap-4 w-full relative z-20">
+                          {/* Primeira Linha: Busca e Abas */}
+                          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                            <div className="relative flex-1 max-w-xl">
+                              <input
+                                type="text"
+                                placeholder="BUSCAR PESSOA/PEDIDO..."
+                                value={historySearchQuery}
+                                onChange={(e) => setHistorySearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
+                              />
+                              <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
+
+                            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl self-start md:self-auto overflow-x-auto no-scrollbar">
+                              <button 
+                                onClick={() => setHistoryTab('all')}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase whitespace-nowrap transition-all ${historyTab === 'all' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                              >
+                                Tudo
+                              </button>
+                              <button 
+                                onClick={() => setHistoryTab('clients')}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase whitespace-nowrap transition-all ${historyTab === 'clients' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                              >
+                                Clientes
+                              </button>
+                              <button 
+                                onClick={() => setHistoryTab('purchases')}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase whitespace-nowrap transition-all ${historyTab === 'purchases' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                              >
+                                Compras
+                              </button>
+                            </div>
                           </div>
 
-                          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
-                            <button 
-                              onClick={() => setHistoryTab('all')}
-                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${historyTab === 'all' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
-                            >
-                              Tudo
-                            </button>
-                            <button 
-                              onClick={() => setHistoryTab('clients')}
-                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${historyTab === 'clients' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
-                            >
-                              Clientes
-                            </button>
-                            <button 
-                              onClick={() => setHistoryTab('purchases')}
-                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${historyTab === 'purchases' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-500'}`}
-                            >
-                              Compras
-                            </button>
-                          </div>
+                          {/* Segunda Linha: Ações */}
+                          {consolidatedHistory.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                              <button
+                                onClick={toggleSelectAllHistory}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm ${
+                                  selectedHistoryItems.length === consolidatedHistory.length && consolidatedHistory.length > 0
+                                    ? 'bg-rose-50 text-rose-600 dark:bg-rose-900/10 hover:bg-rose-100'
+                                    : 'bg-white text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-50 border border-slate-200 dark:border-slate-700'
+                                }`}
+                              >
+                                {selectedHistoryItems.length === consolidatedHistory.length && consolidatedHistory.length > 0 ? (
+                                  <><X size={14} weight="bold" /> Limpar</>
+                                ) : (
+                                  <><CheckSquare size={14} weight="bold" /> Marcar Tudo</>
+                                )}
+                              </button>
 
-                          {selectedHistoryItems.length > 0 && (
-                            <button
-                              onClick={handleExportConsolidatedPDF}
-                              disabled={isExportingPDF}
-                              className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
-                            >
-                              {isExportingPDF ? <ArrowsClockwise size={14} className="animate-spin" /> : <FilePdf size={14} weight="bold" />}
-                              Gerar PDF ({selectedHistoryItems.length})
-                            </button>
+                              <button
+                                onClick={handleExportConsolidatedPDF}
+                                disabled={isExportingPDF}
+                                className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9px] font-black uppercase transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50 ml-auto"
+                              >
+                                {isExportingPDF ? <ArrowsClockwise size={14} className="animate-spin" /> : <FilePdf size={14} weight="bold" />}
+                                {selectedHistoryItems.length > 0 ? `Exportar Selecionados (${selectedHistoryItems.length})` : 'Exportar Tudo'}
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1194,9 +1227,13 @@ export const DashboardView = ({
                                 >
                                   <button 
                                     onClick={() => toggleHistorySelection(item.id)}
-                                    className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedHistoryItems.includes(item.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600'}`}
+                                    className={`w-6 h-6 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all shadow-sm ${
+                                      selectedHistoryItems.includes(item.id) 
+                                        ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                        : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 hover:border-indigo-400'
+                                    }`}
                                   >
-                                    {selectedHistoryItems.includes(item.id) && <CheckCircle size={12} weight="bold" />}
+                                    {selectedHistoryItems.includes(item.id) && <CheckCircle size={14} weight="bold" />}
                                   </button>
 
                                   <div 

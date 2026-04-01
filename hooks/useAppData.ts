@@ -77,7 +77,14 @@ export const useAppData = () => {
                 safeFetch(() => bankAccountService.getAccounts(), 'bank_accounts'),
                 safeFetch(async () => {
                    const snap = await getDocs(collection(db, 'cheques'));
-                   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Cheque));
+                   return snap.docs.map(d => {
+                       const data = d.data();
+                       return { 
+                           id: d.id, 
+                           ...data,
+                           isPaid: data.is_paid ?? data.isPaid 
+                       } as Cheque;
+                   });
                 }, 'cheques'),
             ]);
 
@@ -768,9 +775,16 @@ export const useAppData = () => {
             }),
 
             updateChequeStatus: async (chequeId: string, isPaid: boolean) => withSaving(async () => {
-                await updateDoc(doc(db, 'cheques', chequeId), { isPaid });
+                await updateDoc(doc(db, 'cheques', chequeId), { is_paid: isPaid });
                 const snap = await getDocs(collection(db, 'cheques'));
-                const chqs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Cheque));
+                const chqs = snap.docs.map(d => {
+                    const data = d.data();
+                    return { 
+                        id: d.id, 
+                        ...data,
+                        isPaid: data.is_paid ?? data.isPaid 
+                    } as Cheque;
+                });
                 setCheques(chqs);
                 const updPurchases = await purchaseService.getPurchases();
                 setPurchases(updPurchases);

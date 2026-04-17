@@ -3,8 +3,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Product, Customer, Supplier, Sale, AccountEntry, Transaction, Purchase, Receipt, AgendaTask, AppNote, AppColor, AppUnit, AppGrid, ExpenseCategory, FamilyMember, PersonalCategory, PersonalBudget, PersonalTransaction, BankAccount, AccountTransfer, Cheque } from '../types';
 import { generateId, sanitizeBankAccountId } from '../lib/utils';
 import { bankAccountService } from '../services/bankAccountService';
-import { db } from '../services/api';
-import { collection, getDocs, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { productService } from '../services/productService';
 import { customerService } from '../services/customerService';
 import { supplierService } from '../services/supplierService';
@@ -14,6 +12,17 @@ import { financeService } from '../services/financeService';
 import { configService } from '../services/configService';
 import { receiptService } from '../services/receiptService';
 import { personalFinanceService } from '../services/personalFinanceService';
+import { auth, db } from '../lib/firebase';
+import { 
+    collection, 
+    getDocs, 
+    updateDoc, 
+    doc, 
+    setDoc, 
+    getDoc, 
+    writeBatch
+} from 'firebase/firestore';
+import { getScopedCollection, getScopedDoc } from '../services/api';
 
 export const useAppData = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -44,8 +53,47 @@ export const useAppData = () => {
     const [cheques, setCheques] = useState<Cheque[]>([]);
 
     const syncData = useCallback(async () => {
+        if (!auth.currentUser) return;
+        const uid = auth.currentUser.uid;
+        
         setIsLoading(true);
         try {
+            // MIGRATION CHECK
+            const migrationTokenRef = doc(db, 'users', uid, 'settings', 'migration');
+            const migrationToken = await getDoc(migrationTokenRef);
+
+            if (!migrationToken.exists()) {
+                console.log('🔄 Verificando necessidade de migração para o usuário:', uid);
+                const globalProductsSnap = await getDocs(collection(db, 'products'));
+                if (!globalProductsSnap.empty) {
+                    console.log('📦 Dados globais detectados. Iniciando migração zero-loss...');
+                    
+                    const collectionsToMigrate = [
+                        'products', 'variations', 'wholesale_stock_items', 'customers', 'suppliers',
+                        'colors', 'units', 'grids', 'grid_distributions', 'expense_categories',
+                        'sales', 'sale_items', 'financials', 'transactions', 'purchases', 'purchase_items',
+                        'receipts', 'receipt_payments', 'tasks', 'notes', 'bank_accounts',
+                        'family_members', 'personal_categories', 'personal_budgets', 'personal_transactions',
+                        'cheques'
+                    ];
+
+                    for (const collName of collectionsToMigrate) {
+                        const snap = await getDocs(collection(db, collName));
+                        if (!snap.empty) {
+                            const batch = writeBatch(db);
+                            snap.docs.forEach(d => {
+                                const newRef = doc(db, 'users', uid, collName, d.id);
+                                batch.set(newRef, d.data());
+                            });
+                            await batch.commit();
+                            console.log(`✅ Coleção ${collName} migrada.`);
+                        }
+                    }
+                }
+                await setDoc(migrationTokenRef, { migrated_at: new Date().toISOString(), status: 'complete' });
+                console.log('🏁 Migração concluída com sucesso.');
+            }
+
             const safeFetch = async (fn: () => Promise<any>, label: string) => {
                 try {
                     return await fn();
@@ -76,7 +124,7 @@ export const useAppData = () => {
                 safeFetch(() => personalFinanceService.getTransactions(), 'personal_transactions'),
                 safeFetch(() => bankAccountService.getAccounts(), 'bank_accounts'),
                 safeFetch(async () => {
-                   const snap = await getDocs(collection(db, 'cheques'));
+                   const snap = await getDocs(getScopedCollection('cheques'));
                    return snap.docs.map(d => {
                        const data = d.data();
                        return { 
@@ -118,13 +166,20 @@ export const useAppData = () => {
     }, []);
 
     useEffect(() => {
-        syncData();
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            if (user) {
+                syncData();
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
     }, [syncData]);
 
     const testConnection = async () => {
         try {
-            // Test Firestore by trying to get one product (doesn't matter if it exists)
-            await getDocs(collection(db, 'products'));
+            if (!auth.currentUser) return { success: false, message: 'Usuário não autenticado' };
+            await getDocs(getScopedCollection('products'));
             return { success: true };
         } catch (error: any) {
             console.error('Erro no teste de conexão Firebase:', error);
@@ -464,7 +519,7 @@ export const useAppData = () => {
 
                 if (t.type === 'expense_payment' && (t.description.toLowerCase().includes('pró-labore') || t.description.toLowerCase().includes('pro-labore'))) {
                     try {
-                        const personalIncome = await personalFinanceService.createTransaction({
+                        const personalIncome = await personalFinanceService.addTransaction({
                             date: t.date,
                             type: 'income',
                             amount: Math.abs(t.amount),
@@ -506,7 +561,7 @@ export const useAppData = () => {
             }),
 
             addFamilyMember: async (m: any) => withSaving(async () => {
-                const member = await personalFinanceService.createFamilyMember(m);
+                const member = await personalFinanceService.addFamilyMember(m);
                 setFamilyMembers(prev => [...prev, member].sort((a, b) => a.name.localeCompare(b.name)));
             }),
             updateFamilyMember: async (m: FamilyMember) => withSaving(async () => {
@@ -519,7 +574,7 @@ export const useAppData = () => {
             }),
 
             addPersonalCategory: async (c: any) => withSaving(async () => {
-                const cat = await personalFinanceService.createCategory(c);
+                const cat = await personalFinanceService.addCategory(c);
                 setPersonalCategories(prev => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)));
             }),
             updatePersonalCategory: async (c: PersonalCategory) => withSaving(async () => {
@@ -567,7 +622,7 @@ export const useAppData = () => {
                     setBankAccounts(updAccs);
                 }
 
-                const trans = await personalFinanceService.createTransaction({
+                const trans = await personalFinanceService.addTransaction({
                     ...t,
                     businessTransactionId: businessTxId
                 });
@@ -634,7 +689,7 @@ export const useAppData = () => {
             }),
 
             addColor: async (c: any) => withSaving(async () => {
-                const color = await configService.createColor({ ...c, id: generateId() });
+                const color = await configService.addColor({ ...c, id: generateId() });
                 setColors(prev => [...prev, color]);
             }),
             updateColor: async (c: AppColor) => withSaving(async () => {
@@ -647,7 +702,7 @@ export const useAppData = () => {
             }),
 
             addUnit: async (u: any) => withSaving(async () => {
-                const unit = await configService.createUnit({ ...u, id: generateId() });
+                const unit = await configService.addUnit({ ...u, id: generateId() });
                 setUnits(prev => [...prev, unit]);
             }),
             updateUnit: async (u: AppUnit) => withSaving(async () => {
@@ -660,7 +715,7 @@ export const useAppData = () => {
             }),
 
             addGrid: async (g: any) => withSaving(async () => {
-                const grid = await configService.createGrid({ ...g, id: generateId(), distributions: [] });
+                const grid = await configService.addGrid({ ...g, id: generateId(), distributions: [] });
                 setGrids(prev => [...prev, grid]);
             }),
             updateGrid: async (g: AppGrid) => withSaving(async () => {
@@ -699,7 +754,7 @@ export const useAppData = () => {
             }),
 
             addExpenseCategory: async (c: any) => withSaving(async () => {
-                const category = await configService.createExpenseCategory(c);
+                const category = await configService.addExpenseCategory(c);
                 setCategories(prev => [...prev, category]);
             }),
             updateExpenseCategory: async (c: ExpenseCategory) => withSaving(async () => {
@@ -712,12 +767,12 @@ export const useAppData = () => {
             }),
 
             addBankAccount: async (name: string, balance: number) => withSaving(async () => {
-                const account = await bankAccountService.createAccount(name, balance);
+                const account = await bankAccountService.addAccount({ name, balance });
                 setBankAccounts(prev => [...prev, account]);
             }),
             updateBankAccount: async (id: string, updates: Partial<BankAccount>) => withSaving(async () => {
-                const updated = await bankAccountService.updateAccount(id, updates);
-                setBankAccounts(prev => prev.map(a => a.id === id ? updated : a));
+                await bankAccountService.updateAccount({ ...updates, id } as BankAccount);
+                setBankAccounts(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
             }),
             deleteBankAccount: async (id: string) => withSaving(async () => {
                 if (id === 'estoque-virtual') {
@@ -769,14 +824,14 @@ export const useAppData = () => {
             }),
 
             updateReceiptStatus: async (receiptId: string, status: any) => withSaving(async () => {
-                await updateDoc(doc(db, 'receipts', receiptId), { status });
+                await updateDoc(getScopedDoc('receipts', receiptId), { status });
                 const updReceipts = await receiptService.getReceipts();
                 setReceipts(updReceipts);
             }),
 
             updateChequeStatus: async (chequeId: string, isPaid: boolean) => withSaving(async () => {
-                await updateDoc(doc(db, 'cheques', chequeId), { is_paid: isPaid });
-                const snap = await getDocs(collection(db, 'cheques'));
+                await updateDoc(getScopedDoc('cheques', chequeId), { is_paid: isPaid });
+                const snap = await getDocs(getScopedCollection('cheques'));
                 const chqs = snap.docs.map(d => {
                     const data = d.data();
                     return { 

@@ -1,5 +1,4 @@
-// services/productService.ts
-import { db } from './api';
+import { db, getScopedCollection, getScopedDoc } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch, limit } from 'firebase/firestore';
 import { Product, Variation, WholesaleStockItem } from '../types';
 import { generateId, cleanFirestoreData } from '../lib/utils';
@@ -47,9 +46,9 @@ const buildProduct = (rawProduct: any, rawProductId: string, variations: any[], 
 export const productService = {
     getProducts: async (): Promise<Product[]> => {
         const [productsSnap, variationsSnap, wholesaleSnap] = await Promise.all([
-            getDocs(query(collection(db, 'products'), orderBy('reference'))),
-            getDocs(collection(db, 'variations')),
-            getDocs(collection(db, 'wholesale_stock_items'))
+            getDocs(query(getScopedCollection('products'), orderBy('reference'))),
+            getDocs(getScopedCollection('variations')),
+            getDocs(getScopedCollection('wholesale_stock_items'))
         ]);
 
         const variations = variationsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -59,12 +58,12 @@ export const productService = {
     },
 
     getProductById: async (id: string): Promise<Product | undefined> => {
-        const productDoc = await getDoc(doc(db, 'products', id));
+        const productDoc = await getDoc(getScopedDoc('products', id));
         if (!productDoc.exists()) return undefined;
 
         const [variationsSnap, wholesaleSnap] = await Promise.all([
-            getDocs(query(collection(db, 'variations'), where('product_id', '==', id))),
-            getDocs(query(collection(db, 'wholesale_stock_items'), where('product_id', '==', id)))
+            getDocs(query(getScopedCollection('variations'), where('product_id', '==', id))),
+            getDocs(query(getScopedCollection('wholesale_stock_items'), where('product_id', '==', id)))
         ]);
 
         const variations = variationsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -92,11 +91,11 @@ export const productService = {
         let productRef;
 
         if (productId && productId.trim()) {
-            productRef = doc(db, 'products', productId);
+            productRef = getScopedDoc('products', productId);
             console.log(`[Firestore Write] Setting product ${productId}:`, productToInsert);
             batch.set(productRef, productToInsert);
         } else {
-            productRef = doc(collection(db, 'products'));
+            productRef = doc(getScopedCollection('products'));
             productId = productRef.id;
             console.log(`[Firestore Write] Creating product ${productId}:`, productToInsert);
             batch.set(productRef, productToInsert);
@@ -104,7 +103,7 @@ export const productService = {
 
         if (p.variations?.length) {
             p.variations.forEach(v => {
-                const vRef = v.id ? doc(db, 'variations', v.id) : doc(collection(db, 'variations'));
+                const vRef = v.id ? getScopedDoc('variations', v.id) : doc(getScopedCollection('variations'));
                 batch.set(vRef, cleanFirestoreData({
                     product_id: productId,
                     color_id: v.colorId || null,
@@ -122,7 +121,7 @@ export const productService = {
 
         if (p.wholesaleStock?.length) {
             p.wholesaleStock.forEach(ws => {
-                const wsRef = ws.id ? doc(db, 'wholesale_stock_items', ws.id) : doc(collection(db, 'wholesale_stock_items'));
+                const wsRef = ws.id ? getScopedDoc('wholesale_stock_items', ws.id) : doc(getScopedCollection('wholesale_stock_items'));
                 batch.set(wsRef, cleanFirestoreData({
                     product_id: productId,
                     color_id: ws.colorId || null,
@@ -142,7 +141,7 @@ export const productService = {
 
     updateProduct: async (product: Product): Promise<Product> => {
         const batch = writeBatch(db);
-        const productRef = doc(db, 'products', product.id);
+        const productRef = getScopedDoc('products', product.id);
         
         const cleanedProduct = cleanFirestoreData({
             reference: String(product.reference || ''),
@@ -162,17 +161,17 @@ export const productService = {
 
         // 1. Variações Varejo
         try {
-            const variationsSnap = await getDocs(query(collection(db, 'variations'), where('product_id', '==', product.id)));
+            const variationsSnap = await getDocs(query(getScopedCollection('variations'), where('product_id', '==', product.id)));
             const dbVariationIds = variationsSnap.docs.map(d => d.id);
             const currentVariationIds = product.variations.map(v => v.id).filter(id => !!id);
             const idsToDelete = dbVariationIds.filter(id => !currentVariationIds.includes(id));
 
-            idsToDelete.forEach(id => batch.delete(doc(db, 'variations', id)));
+            idsToDelete.forEach(id => batch.delete(getScopedDoc('variations', id)));
 
             if (product.variations.length > 0) {
                 product.variations.forEach(v => {
                     const id = v.id || generateId();
-                    const vRef = doc(db, 'variations', id);
+                    const vRef = getScopedDoc('variations', id);
                     batch.set(vRef, cleanFirestoreData({
                         product_id: product.id,
                         color_id: v.colorId || null,
@@ -194,16 +193,16 @@ export const productService = {
 
         // 2. Estoque Atacado
         try {
-            const wholesaleSnap = await getDocs(query(collection(db, 'wholesale_stock_items'), where('product_id', '==', product.id)));
+            const wholesaleSnap = await getDocs(query(getScopedCollection('wholesale_stock_items'), where('product_id', '==', product.id)));
             const dbWholesaleIds = wholesaleSnap.docs.map(d => d.id);
             const currentWholesaleIds = product.wholesaleStock.map(ws => ws.id).filter(id => !!id);
             const wsIdsToDelete = dbWholesaleIds.filter(id => !currentWholesaleIds.includes(id));
 
-            wsIdsToDelete.forEach(id => batch.delete(doc(db, 'wholesale_stock_items', id)));
+            wsIdsToDelete.forEach(id => batch.delete(getScopedDoc('wholesale_stock_items', id)));
 
             // Sincronização de preço Atacado -> Varejo
-            const gridsSnap = await getDocs(collection(db, 'grids'));
-            const distsSnap = await getDocs(collection(db, 'grid_distributions'));
+            const gridsSnap = await getDocs(getScopedCollection('grids'));
+            const distsSnap = await getDocs(getScopedCollection('grid_distributions'));
             
             const allGrids = gridsSnap.docs.map(gDoc => ({
                 id: gDoc.id,
@@ -215,7 +214,7 @@ export const productService = {
             if (product.wholesaleStock?.length) {
                 product.wholesaleStock.forEach(ws => {
                     const id = ws.id || generateId();
-                    const wsRef = doc(db, 'wholesale_stock_items', id);
+                    const wsRef = getScopedDoc('wholesale_stock_items', id);
                     
                     const wsData = cleanFirestoreData({
                         product_id: product.id,
@@ -257,7 +256,7 @@ export const productService = {
                                             image: v.image || null,
                                             grid_id: v.gridId || null
                                         });
-                                        batch.set(doc(db, 'variations', vId), vData);
+                                        batch.set(getScopedDoc('variations', vId), vData);
                                     }
                                 });
                             }
@@ -278,32 +277,32 @@ export const productService = {
         const batch = writeBatch(db);
         
         // Remove referências
-        const saleItemsSnap = await getDocs(query(collection(db, 'sale_items'), where('product_id', '==', id)));
+        const saleItemsSnap = await getDocs(query(getScopedCollection('sale_items'), where('product_id', '==', id)));
         saleItemsSnap.forEach(d => batch.delete(d.ref));
 
-        const purchaseItemsSnap = await getDocs(query(collection(db, 'purchase_items'), where('product_id', '==', id)));
+        const purchaseItemsSnap = await getDocs(query(getScopedCollection('purchase_items'), where('product_id', '==', id)));
         purchaseItemsSnap.forEach(d => batch.delete(d.ref));
 
-        const variationsSnap = await getDocs(query(collection(db, 'variations'), where('product_id', '==', id)));
+        const variationsSnap = await getDocs(query(getScopedCollection('variations'), where('product_id', '==', id)));
         variationsSnap.forEach(d => batch.delete(d.ref));
 
-        const wholesaleSnap = await getDocs(query(collection(db, 'wholesale_stock_items'), where('product_id', '==', id)));
+        const wholesaleSnap = await getDocs(query(getScopedCollection('wholesale_stock_items'), where('product_id', '==', id)));
         wholesaleSnap.forEach(d => batch.delete(d.ref));
 
-        batch.delete(doc(db, 'products', id));
+        batch.delete(getScopedDoc('products', id));
 
         await batch.commit();
     },
 
     syncStockWithHistory: async (): Promise<void> => {
         const [purchasesSnap, purItemsSnap, salesSnap, saleItemsSnap, variationsSnap, wholesaleSnap, colorsSnap] = await Promise.all([
-            getDocs(query(collection(db, 'purchases'), where('type', '==', 'inventory'))),
-            getDocs(collection(db, 'purchase_items')),
-            getDocs(collection(db, 'sales')),
-            getDocs(collection(db, 'sale_items')),
-            getDocs(collection(db, 'variations')),
-            getDocs(collection(db, 'wholesale_stock_items')),
-            getDocs(collection(db, 'colors'))
+            getDocs(query(getScopedCollection('purchases'), where('type', '==', 'inventory'))),
+            getDocs(getScopedCollection('purchase_items')),
+            getDocs(getScopedCollection('sales')),
+            getDocs(getScopedCollection('sale_items')),
+            getDocs(getScopedCollection('variations')),
+            getDocs(getScopedCollection('wholesale_stock_items')),
+            getDocs(getScopedCollection('colors'))
         ]);
 
         const purchaseItems = purItemsSnap.docs.map(d => d.data());
@@ -367,14 +366,14 @@ export const productService = {
 
         const batch = writeBatch(db);
         Object.entries(finalVarStocks).forEach(([id, stock]) => {
-            batch.update(doc(db, 'variations', id), { stock });
+            batch.update(getScopedDoc('variations', id), { stock });
         });
 
         groupToIds.forEach((ids, key) => {
             const totalForGroup = groupStocks[key] || 0;
             ids.forEach((id, index) => {
                 const finalBoxes = (index === 0) ? totalForGroup : 0;
-                batch.update(doc(db, 'wholesale_stock_items', id), { boxes: finalBoxes });
+                batch.update(getScopedDoc('wholesale_stock_items', id), { boxes: finalBoxes });
             });
         });
 

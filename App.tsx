@@ -1,14 +1,16 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   House, ShoppingCart, Package, Users, CurrencyDollar, ChartBar, Truck,
   List, X, ClockCounterClockwise, Stack, ShoppingBag, Moon, Sun, Lightning,
   ArrowLeft, Lightbulb, Handshake, ChartPie, Note, DeviceMobile,
-  ChatCircle, SignOut, CalendarBlank, ArrowSquareOut, Gear, AddressBook
+  ChatCircle, SignOut, CalendarBlank, ArrowSquareOut, Gear, AddressBook, CircleNotch
 } from '@phosphor-icons/react';
 
 import { ViewType, Product } from './types';
 import { useAppData } from './hooks/useAppData';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
+import { AuthView } from './views/AuthView';
 import { NavItem } from './components/NavItem';
 import { AIAssistant } from './components/AIAssistant';
 import { FloatingShortcuts } from './components/FloatingShortcuts';
@@ -40,6 +42,8 @@ const App: React.FC = () => {
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const [targetSupplierId, setTargetSupplierId] = useState<string | undefined>(undefined);
   const [customerInitialData, setCustomerInitialData] = useState<{ name: string; phone: string; address: string } | undefined>(undefined);
@@ -58,9 +62,23 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
+
+  const handleSignOut = async () => {
+    if (confirm('Deseja realmente sair da sua conta?')) {
+      await signOut(auth);
+    }
+  };
 
   const stats = useMemo(() => {
     // data.bankAccounts aqui já inclui o 'estoque-virtual' vindo do useAppData
@@ -320,6 +338,23 @@ const App: React.FC = () => {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950 font-sans">
+        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-600/20 mb-4 text-white animate-bounce">
+          <Lightning size={32} weight="fill" />
+        </div>
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase tracking-widest">
+          <CircleNotch size={16} className="animate-spin" /> Carregando Musgo ERP...
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthView onAuthSuccess={() => {}} />;
+  }
+
   return (
     <div className="flex h-[100dvh] w-full bg-slate-300 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 pt-[0.6cm]">
 
@@ -438,9 +473,10 @@ const App: React.FC = () => {
       <div className="flex-1 flex flex-col overflow-hidden relative">
 
         {/* Header */}
-        <header className="h-14 border-b bg-white dark:bg-slate-900 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40 relative">
+        <header className="h-14 border-b bg-white dark:bg-slate-900 dark:border-slate-800 flex items-center justify-between px-3 sm:px-6 shrink-0 z-40 relative">
 
-          <div className="flex items-center gap-2">
+          {/* Grupo Esquerda: Menu, Logo e Status */}
+          <div className="flex items-center gap-2 sm:gap-4">
             <button onClick={() => setIsSidebarOpen(true)} className="hidden lg:flex p-2 text-slate-500" title="Abrir menu" aria-label="Abrir menu">
               <List size={20} weight="bold" />
             </button>
@@ -448,73 +484,61 @@ const App: React.FC = () => {
               <List size={18} weight="bold" />
             </button>
 
-            <div className="lg:hidden flex items-center gap-1.5 font-black text-blue-600 text-[13px] uppercase tracking-tighter ml-1">
-              <Lightning size={14} weight="fill" /> GestãoPro
+            <div className="lg:hidden flex items-center gap-1.5 font-black text-blue-600 text-[12px] uppercase tracking-tighter">
+              <Lightning size={14} weight="fill" /> GestãoPro 
+              <div className={`w-2 h-2 rounded-full ml-1 ${isSaving ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} title={isSaving ? 'Sincronizando...' : 'Conectado'}></div>
             </div>
 
             {view !== 'dashboard' && (
               <button
                 onClick={() => setView('dashboard')}
-                className="hidden lg:flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-blue-600/20 active:scale-95 transition-all ml-2"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
               >
                 <ArrowLeft size={14} weight="bold" /> Voltar
               </button>
             )}
-
-            <div className="hidden md:flex items-center gap-1 ml-2 pl-2 border-l dark:border-slate-700">
-              <button
-                onClick={() => window.open('https://keep.google.com', '_blank')}
-                className="p-1.5 hover:bg-yellow-50 text-slate-400 hover:text-yellow-600 rounded-lg transition-colors"
-                title="Google Keep"
-              >
-                <Note size={16} weight="duotone" />
-              </button>
-              <button
-                onClick={() => window.open('https://web.whatsapp.com', '_blank')}
-                className="p-1.5 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors"
-                title="WhatsApp Web"
-              >
-                <DeviceMobile size={16} weight="duotone" />
-              </button>
-              <button
-                onClick={() => window.open('whatsapp://', '_blank')}
-                className="p-1.5 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors"
-                title="App WhatsApp"
-              >
-                <ChatCircle size={16} weight="duotone" />
-              </button>
-            </div>
           </div>
 
-          <div className="flex items-center gap-3 absolute left-1/2 -translate-x-1/2">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isSaving ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></div>
-              <span className="hidden sm:inline text-[9px] font-black text-slate-400 uppercase">{isSaving ? 'Salvando...' : 'Online'}</span>
-            </div>
+          {/* Grupo Direita: Ações e Ferramentas */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Botão Atualizar - Agora à direita */}
             <button
               onClick={() => window.location.reload()}
-              className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 rounded-lg text-[8px] font-black uppercase transition-all"
+              className="flex items-center gap-1 px-2 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 rounded-lg text-[8px] font-black uppercase transition-all"
               title="Atualizar programa"
             >
               <ClockCounterClockwise size={12} weight="bold" />
               <span className="hidden xs:inline">Atualizar</span>
             </button>
-          </div>
 
-          <div className="flex items-center gap-2">
+            {/* Separador sutil */}
+            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+            {/* Tema */}
             <button
               onClick={() => setDarkMode(!darkMode)}
-              className="lg:hidden p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-xl"
+              className="p-2 text-slate-400 hover:text-blue-500 transition-colors rounded-xl"
               title="Alternar tema"
-              aria-label="Alternar tema"
             >
               {darkMode ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
             </button>
+
+            {/* Sair */}
+            <button
+              onClick={handleSignOut}
+              className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-xl"
+              title="Sair da conta"
+            >
+              <SignOut size={18} weight="bold" />
+            </button>
+
+            {/* AI Assistant */}
             <button
               onClick={() => setIsAIOpen(!isAIOpen)}
-              className="px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-[10px] font-black flex items-center gap-1.5 uppercase text-slate-500"
+              className="ml-1 px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-black flex items-center gap-1.5 uppercase transition-all hover:bg-blue-100"
             >
-              <Lightbulb size={12} weight="duotone" /> Lampy
+              <Lightbulb size={12} weight="duotone" />
+              <span className="hidden sm:inline">Lampy</span>
             </button>
           </div>
         </header>

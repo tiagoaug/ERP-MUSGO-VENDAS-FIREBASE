@@ -163,6 +163,7 @@ export interface Sale {
   paymentHistory?: PaymentRecord[];
   bankAccountId?: string;
   categoryId?: string;
+  usedBalance?: number;
   releaseHistory?: { date: string; items: SaleItem[]; saleNumber: string }[];
 }
 

@@ -3,7 +3,7 @@ import { Sale, Customer, Purchase, Supplier, ExpenseCategory, Receipt, Product, 
 import { StatBox } from '../components/StatBox';
 import { formatMoney } from '../lib/utils';
 import { CategoryBarChart } from '../components/CategoryBarChart';
-import { db } from '../services/api';
+import { db, getScopedCollection } from '../services/api';
 import { collection, getDocs, limit, query, doc, updateDoc } from 'firebase/firestore';
 import {
   CurrencyDollar, Package, ArrowSquareUpRight, ArrowSquareDownLeft,
@@ -417,7 +417,7 @@ export const DashboardView = ({
     setLastError(null);
     try {
       // Tenta uma operação simples de leitura no Firebase
-      const q = query(collection(db, 'colors'), limit(1));
+      const q = query(getScopedCollection('colors'), limit(1));
       await getDocs(q);
       setConnStatus('ok');
     } catch (err: any) {
@@ -1410,7 +1410,7 @@ export const DashboardView = ({
                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
                     {connStatus === 'idle' ? 'Clique para testar conexão com banco de dados' :
                       connStatus === 'checking' ? 'Verificando...' :
-                        connStatus === 'ok' ? 'Conectado ao Supabase' : 'Falha na Conexão'}
+                        connStatus === 'ok' ? 'Conectado ao Firebase' : 'Falha na Conexão'}
                   </p>
                 </div>
               </div>

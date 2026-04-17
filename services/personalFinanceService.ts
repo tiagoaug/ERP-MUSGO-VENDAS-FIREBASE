@@ -1,5 +1,5 @@
 // services/personalFinanceService.ts
-import { db } from './api';
+import { db, getScopedCollection, getScopedDoc } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
 import { FamilyMember, PersonalCategory, PersonalBudget, PersonalTransaction } from '../types';
 import { cleanFirestoreData } from '../lib/utils';
@@ -7,29 +7,29 @@ import { cleanFirestoreData } from '../lib/utils';
 export const personalFinanceService = {
     // --- Family Members ---
     getFamilyMembers: async (): Promise<FamilyMember[]> => {
-        const q = query(collection(db, 'family_members'), orderBy('name'));
+        const q = query(getScopedCollection('family_members'), orderBy('name'));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FamilyMember));
     },
 
-    createFamilyMember: async (member: Omit<FamilyMember, 'id'>): Promise<FamilyMember> => {
-        const docRef = await addDoc(collection(db, 'family_members'), cleanFirestoreData(member));
+    addFamilyMember: async (member: Partial<FamilyMember>): Promise<FamilyMember> => {
+        const docRef = await addDoc(getScopedCollection('family_members'), cleanFirestoreData(member));
         return { id: docRef.id, ...member } as FamilyMember;
     },
 
     updateFamilyMember: async (member: FamilyMember): Promise<FamilyMember> => {
         const { id, ...data } = member;
-        await updateDoc(doc(db, 'family_members', id), cleanFirestoreData(data));
+        await updateDoc(getScopedDoc('family_members', id), cleanFirestoreData(data));
         return member;
     },
 
     deleteFamilyMember: async (id: string): Promise<void> => {
-        await deleteDoc(doc(db, 'family_members', id));
+        await deleteDoc(getScopedDoc('family_members', id));
     },
 
     // --- Personal Categories ---
     getCategories: async (): Promise<PersonalCategory[]> => {
-        const q = query(collection(db, 'personal_categories'), orderBy('name'));
+        const q = query(getScopedCollection('personal_categories'), orderBy('name'));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => {
             const data = d.data();
@@ -42,18 +42,13 @@ export const personalFinanceService = {
         });
     },
 
-    createCategory: async (category: Omit<PersonalCategory, 'id'>): Promise<PersonalCategory> => {
-        const data = {
-            name: category.name,
-            type: category.type,
-            parent_id: category.parentId || null
-        };
-        const docRef = await addDoc(collection(db, 'personal_categories'), cleanFirestoreData(data));
+    addCategory: async (category: Partial<PersonalCategory>): Promise<PersonalCategory> => {
+        const docRef = await addDoc(getScopedCollection('personal_categories'), cleanFirestoreData(category));
         return {
             id: docRef.id,
-            name: data.name,
-            type: data.type,
-            parentId: data.parent_id || undefined
+            name: category.name!,
+            type: category.type!,
+            parentId: category.parentId
         };
     },
 
@@ -63,7 +58,7 @@ export const personalFinanceService = {
             type: category.type,
             parent_id: category.parentId || null
         };
-        await updateDoc(doc(db, 'personal_categories', category.id), cleanFirestoreData(data));
+        await updateDoc(getScopedDoc('personal_categories', category.id), cleanFirestoreData(data));
         return {
             id: category.id,
             name: data.name,
@@ -73,12 +68,13 @@ export const personalFinanceService = {
     },
 
     deleteCategory: async (id: string): Promise<void> => {
-        await deleteDoc(doc(db, 'personal_categories', id));
+        await deleteDoc(getScopedDoc('personal_categories', id));
     },
 
     // --- Personal Budgets ---
     getBudgets: async (): Promise<PersonalBudget[]> => {
-        const snapshot = await getDocs(collection(db, 'personal_budgets'));
+        const q = query(getScopedCollection('personal_budgets'), orderBy('month', 'desc'));
+        const snapshot = await getDocs(q);
         return snapshot.docs.map(d => {
             const b = d.data();
             return {
@@ -98,7 +94,7 @@ export const personalFinanceService = {
             amount: budget.amount,
             month: budget.month
         };
-        const docRef = await addDoc(collection(db, 'personal_budgets'), cleanFirestoreData(data));
+        const docRef = await addDoc(getScopedCollection('personal_budgets'), cleanFirestoreData(data));
         return {
             id: docRef.id,
             categoryId: data.category_id,
@@ -115,7 +111,7 @@ export const personalFinanceService = {
             amount: budget.amount,
             month: budget.month
         };
-        await updateDoc(doc(db, 'personal_budgets', budget.id), cleanFirestoreData(data));
+        await updateDoc(getScopedDoc('personal_budgets', budget.id), cleanFirestoreData(data));
         return {
             id: budget.id,
             categoryId: data.category_id,
@@ -126,12 +122,12 @@ export const personalFinanceService = {
     },
 
     deleteBudget: async (id: string): Promise<void> => {
-        await deleteDoc(doc(db, 'personal_budgets', id));
+        await deleteDoc(getScopedDoc('personal_budgets', id));
     },
 
     // --- Transactions ---
     getTransactions: async (): Promise<PersonalTransaction[]> => {
-        const q = query(collection(db, 'personal_transactions'), orderBy('date', 'desc'));
+        const q = query(getScopedCollection('personal_transactions'), orderBy('date', 'desc'));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => {
             const t = d.data();
@@ -151,33 +147,12 @@ export const personalFinanceService = {
         });
     },
 
-    createTransaction: async (t: Omit<PersonalTransaction, 'id'>): Promise<PersonalTransaction> => {
-        const data = {
-            date: t.date,
-            type: t.type,
-            amount: t.amount,
-            description: t.description,
-            category_id: t.categoryId || null,
-            member_id: t.memberId || null,
-            is_paid: t.isPaid,
-            business_transaction_id: t.businessTransactionId || null,
-            payment_method: t.paymentMethod || null,
-            bank_account_id: t.bank_account_id || null
-        };
-        const docRef = await addDoc(collection(db, 'personal_transactions'), cleanFirestoreData(data));
+    addTransaction: async (data: Partial<PersonalTransaction>): Promise<PersonalTransaction> => {
+        const docRef = await addDoc(getScopedCollection('personal_transactions'), cleanFirestoreData(data));
         return {
             id: docRef.id,
-            date: data.date,
-            type: data.type,
-            amount: data.amount,
-            description: data.description,
-            categoryId: data.category_id || undefined,
-            memberId: data.member_id || undefined,
-            isPaid: data.is_paid,
-            businessTransactionId: data.business_transaction_id || undefined,
-            paymentMethod: data.payment_method || undefined,
-            bank_account_id: data.bank_account_id || undefined
-        };
+            ...data
+        } as PersonalTransaction;
     },
 
     updateTransaction: async (t: PersonalTransaction): Promise<PersonalTransaction> => {
@@ -193,7 +168,7 @@ export const personalFinanceService = {
             payment_method: t.paymentMethod || null,
             bank_account_id: t.bank_account_id || null
         };
-        await updateDoc(doc(db, 'personal_transactions', t.id), cleanFirestoreData(data));
+        await updateDoc(getScopedDoc('personal_transactions', t.id), cleanFirestoreData(data));
         return {
             id: t.id,
             date: data.date,
@@ -210,6 +185,6 @@ export const personalFinanceService = {
     },
 
     deleteTransaction: async (id: string): Promise<void> => {
-        await deleteDoc(doc(db, 'personal_transactions', id));
+        await deleteDoc(getScopedDoc('personal_transactions', id));
     }
 };

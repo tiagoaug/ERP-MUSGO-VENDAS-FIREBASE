@@ -1,36 +1,34 @@
 // services/bankAccountService.ts
-import { db } from './api';
+import { db, getScopedCollection, getScopedDoc } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, increment, writeBatch } from 'firebase/firestore';
 import { BankAccount, AccountTransfer } from '../types';
 import { cleanFirestoreData } from '../lib/utils';
 
 export const bankAccountService = {
     async getAccounts(): Promise<BankAccount[]> {
-        const q = query(collection(db, 'bank_accounts'), orderBy('name'));
+        const q = query(getScopedCollection('bank_accounts'), orderBy('name'));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount));
     },
 
-    async createAccount(name: string, initialBalance: number = 0): Promise<BankAccount> {
-        const docRef = await addDoc(collection(db, 'bank_accounts'), cleanFirestoreData({ name, balance: initialBalance }));
-        return { id: docRef.id, name, balance: initialBalance };
+    async addAccount(account: Partial<BankAccount>): Promise<BankAccount> {
+        const docRef = await addDoc(getScopedCollection('bank_accounts'), cleanFirestoreData(account));
+        return { id: docRef.id, ...account } as BankAccount;
     },
 
-    async updateAccount(id: string, updates: Partial<BankAccount>): Promise<BankAccount> {
-        await updateDoc(doc(db, 'bank_accounts', id), cleanFirestoreData(updates));
-        const updatedDoc = await getDoc(doc(db, 'bank_accounts', id));
-        return { id: updatedDoc.id, ...updatedDoc.data() } as BankAccount;
+    async updateAccount(account: BankAccount): Promise<void> {
+        await updateDoc(getScopedDoc('bank_accounts', account.id), cleanFirestoreData(account));
     },
 
     async deleteAccount(id: string): Promise<void> {
-        await deleteDoc(doc(db, 'bank_accounts', id));
+        await deleteDoc(getScopedDoc('bank_accounts', id));
     },
 
     async transfer(transfer: Omit<AccountTransfer, 'id' | 'created_at'>): Promise<AccountTransfer> {
         const batch = writeBatch(db);
         
         // 1. Create transfer record
-        const transferRef = doc(collection(db, 'account_transfers'));
+        const transferRef = doc(getScopedCollection('account_transfers'));
         const transferData = {
             date: transfer.date || new Date().toISOString(),
             from_account_id: transfer.fromAccountId || null,
@@ -43,13 +41,13 @@ export const bankAccountService = {
 
         // 2. Update 'from' account balance
         if (transfer.fromAccountId) {
-            const fromRef = doc(db, 'bank_accounts', transfer.fromAccountId);
+            const fromRef = getScopedDoc('bank_accounts', transfer.fromAccountId);
             batch.update(fromRef, { balance: increment(-transfer.amount) });
         }
 
         // 3. Update 'to' account balance
         if (transfer.toAccountId) {
-            const toRef = doc(db, 'bank_accounts', transfer.toAccountId);
+            const toRef = getScopedDoc('bank_accounts', transfer.toAccountId);
             batch.update(toRef, { balance: increment(transfer.amount) });
         }
 
@@ -67,15 +65,15 @@ export const bankAccountService = {
     },
 
     async adjustBalance(accountId: string, newBalance: number): Promise<BankAccount> {
-        await updateDoc(doc(db, 'bank_accounts', accountId), cleanFirestoreData({ balance: newBalance }));
-        const updatedDoc = await getDoc(doc(db, 'bank_accounts', accountId));
+        await updateDoc(getScopedDoc('bank_accounts', accountId), cleanFirestoreData({ balance: newBalance }));
+        const updatedDoc = await getDoc(getScopedDoc('bank_accounts', accountId));
         return { id: updatedDoc.id, ...updatedDoc.data() } as BankAccount;
     },
 
     async syncBalance(accountId: string | null, delta: number): Promise<void> {
         if (!accountId || delta === 0) return;
         try {
-            const ref = doc(db, 'bank_accounts', accountId);
+            const ref = getScopedDoc('bank_accounts', accountId);
             await updateDoc(ref, { balance: increment(delta) });
         } catch (err) {
             console.error('CRITICAL: Failed to sync bank account balance:', err);

@@ -1,5 +1,5 @@
 // services/receiptService.ts
-import { db } from './api';
+import { db, getScopedCollection, getScopedDoc } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch, increment } from 'firebase/firestore';
 import { Receipt, ReceiptItem, ExpenseItem, PaymentRecord } from '../types';
 import { generateId, sanitizeBankAccountId, cleanFirestoreData } from '../lib/utils';
@@ -42,10 +42,10 @@ const buildReceipt = (row: any, id: string, items: any[], expenseItems: any[], p
 export const receiptService = {
     getReceipts: async (): Promise<Receipt[]> => {
         const [receiptsSnap, itemsSnap, expItemsSnap, paymentsSnap] = await Promise.all([
-            getDocs(query(collection(db, 'receipts'), orderBy('date', 'desc'))),
-            getDocs(collection(db, 'receipt_items')),
-            getDocs(collection(db, 'receipt_expense_items')),
-            getDocs(collection(db, 'payment_records')),
+            getDocs(query(getScopedCollection('receipts'), orderBy('date', 'desc'))),
+            getDocs(getScopedCollection('receipt_items')),
+            getDocs(getScopedCollection('receipt_expense_items')),
+            getDocs(getScopedCollection('payment_records')),
         ]);
 
         const items = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -57,7 +57,7 @@ export const receiptService = {
 
     createReceipt: async (receipt: Receipt): Promise<Receipt> => {
         const batch = writeBatch(db);
-        const receiptRef = doc(collection(db, 'receipts'));
+        const receiptRef = doc(getScopedCollection('receipts'));
         const receiptId = receiptRef.id;
 
         batch.set(receiptRef, cleanFirestoreData({
@@ -79,7 +79,7 @@ export const receiptService = {
 
         if (receipt.items?.length) {
             receipt.items.forEach(i => {
-                const iRef = doc(collection(db, 'receipt_items'));
+                const iRef = doc(getScopedCollection('receipt_items'));
                 batch.set(iRef, cleanFirestoreData({
                     receipt_id: receiptId,
                     product_id: i.productId || null,
@@ -96,7 +96,7 @@ export const receiptService = {
 
         if (receipt.expenseItems?.length) {
             receipt.expenseItems.forEach(e => {
-                const eRef = doc(collection(db, 'receipt_expense_items'));
+                const eRef = doc(getScopedCollection('receipt_expense_items'));
                 batch.set(eRef, cleanFirestoreData({
                     receipt_id: receiptId,
                     description: e.description || '',
@@ -107,7 +107,7 @@ export const receiptService = {
         }
 
         if (receipt.isPaid && (receipt.accounted ?? true)) {
-            const tRef = doc(collection(db, 'transactions'));
+            const tRef = doc(getScopedCollection('transactions'));
             batch.set(tRef, cleanFirestoreData({
                 date: receipt.date || new Date().toISOString(),
                 type: 'payment',
@@ -128,60 +128,62 @@ export const receiptService = {
     },
 
     updateReceipt: async (receipt: Receipt): Promise<Receipt> => {
-        await updateDoc(doc(db, 'receipts', receipt.id), cleanFirestoreData({
-            receipt_number: receipt.receiptNumber,
-            type: receipt.type,
-            is_wholesale: receipt.isWholesale,
-            customer_id: receipt.customerId,
-            date: receipt.date,
-            due_date: receipt.dueDate || receipt.date,
-            total_value: receipt.totalValue,
-            amount_paid: receipt.amountPaid,
-            is_paid: receipt.isPaid,
-            item_description: receipt.itemDescription,
-            notes: receipt.notes,
+        const batch = writeBatch(db);
+        const receiptRef = getScopedDoc('receipts', receipt.id);
+        
+        batch.update(receiptRef, cleanFirestoreData({
+            receipt_number: receipt.receiptNumber || '',
+            type: receipt.type || 'general',
+            is_wholesale: !!receipt.isWholesale,
+            customer_id: receipt.customerId || null,
+            date: receipt.date || new Date().toISOString(),
+            due_date: receipt.dueDate || receipt.date || new Date().toISOString(),
+            total_value: receipt.totalValue || 0,
+            amount_paid: receipt.amountPaid || 0,
+            is_paid: !!receipt.isPaid,
+            item_description: receipt.itemDescription || null,
+            notes: receipt.notes || null,
             status: receipt.status || 'Pendente',
             accounted: receipt.accounted ?? true,
             bank_account_id: sanitizeBankAccountId(receipt.bankAccountId) || null,
         }));
+
+        await batch.commit();
         return receipt;
     },
 
     deleteReceipt: async (id: string): Promise<void> => {
-        const receiptRef = doc(db, 'receipts', id);
+        const receiptRef = getScopedDoc('receipts', id);
         const receiptSnap = await getDoc(receiptRef);
         if (!receiptSnap.exists()) return;
         const receipt = receiptSnap.data();
 
         const batch = writeBatch(db);
         
-        const itemsSnap = await getDocs(query(collection(db, 'receipt_items'), where('receipt_id', '==', id)));
+        const itemsSnap = await getDocs(query(getScopedCollection('receipt_items'), where('receipt_id', '==', id)));
         itemsSnap.forEach(d => batch.delete(d.ref));
 
-        const expSnap = await getDocs(query(collection(db, 'receipt_expense_items'), where('receipt_id', '==', id)));
+        const expSnap = await getDocs(query(getScopedCollection('receipt_expense_items'), where('receipt_id', '==', id)));
         expSnap.forEach(d => batch.delete(d.ref));
 
-        const paySnap = await getDocs(query(collection(db, 'payment_records'), where('receipt_id', '==', id)));
+        const paySnap = await getDocs(query(getScopedCollection('payment_records'), where('receipt_id', '==', id)));
         paySnap.forEach(d => batch.delete(d.ref));
 
-        const transSnap = await getDocs(query(collection(db, 'transactions'), where('related_id', '==', id)));
+        const transSnap = await getDocs(query(getScopedCollection('transactions'), where('related_id', '==', id)));
         transSnap.forEach(d => batch.delete(d.ref));
-
-        if (receipt.receipt_number) {
-            // Firestore doesn't support ilike naturally, we rely on related_id mostly.
-        }
 
         batch.delete(receiptRef);
         await batch.commit();
         
-        // Reverse balance if was paid and accounted
         if (receipt.is_paid && (receipt.accounted ?? true) && receipt.bank_account_id) {
             await bankAccountService.syncBalance(receipt.bank_account_id, -receipt.total_value);
         }
     },
 
-    addPaymentToReceipt: async (receiptId: string, amount: number, date: string, note?: string, bankAccountId?: string): Promise<void> => {
-        const receiptRef = doc(db, 'receipts', receiptId);
+    addPayment: async (receiptId: string, amount: number, date: string, note: string, bankAccountId?: string): Promise<void> => {
+        const batch = writeBatch(db);
+        const payRef = doc(getScopedCollection('payment_records'));
+        const receiptRef = getScopedDoc('receipts', receiptId);
         const receiptSnap = await getDoc(receiptRef);
         if (!receiptSnap.exists()) throw new Error('Receipt not found');
         const receipt = receiptSnap.data();
@@ -189,13 +191,11 @@ export const receiptService = {
         const accounted = receipt.accounted ?? true;
         const finalBankAccountId = sanitizeBankAccountId(bankAccountId) || receipt.bank_account_id;
 
-        const newPaid = (receipt.amount_paid || 0) + amount;
-        const isPaid = newPaid >= receipt.total_value;
+        batch.update(receiptRef, { 
+            amount_paid: increment(amount),
+            is_paid: (receipt.amount_paid + amount) >= receipt.total_value 
+        });
 
-        const batch = writeBatch(db);
-        batch.update(receiptRef, { amount_paid: newPaid, is_paid: isPaid });
-
-        const payRef = doc(collection(db, 'payment_records'));
         batch.set(payRef, cleanFirestoreData({
             receipt_id: receiptId,
             date: date || new Date().toISOString(),
@@ -204,14 +204,14 @@ export const receiptService = {
         }));
 
         if (accounted) {
-            const tRef = doc(collection(db, 'transactions'));
+            const tRef = doc(getScopedCollection('transactions'));
             batch.set(tRef, cleanFirestoreData({
                 date: date || new Date().toISOString(),
                 type: 'payment',
                 amount: amount || 0,
                 description: `Recebimento ${receipt.receipt_number || ''}`,
                 related_id: receiptId,
-                bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
+                bank_account_id: finalBankAccountId || null
             }));
         }
 
@@ -222,45 +222,42 @@ export const receiptService = {
         }
     },
 
-    deletePaymentFromReceipt: async (receiptId: string, paymentId: string): Promise<void> => {
-        const payRef = doc(db, 'payment_records', paymentId);
-        const paySnap = await getDoc(payRef);
-        if (!paySnap.exists()) return;
-        const payment = paySnap.data() as any;
+    removePayment: async (paymentId: string, amount: number, receiptId: string, bankAccountId?: string): Promise<void> => {
+        const batch = writeBatch(db);
+        batch.delete(getScopedDoc('payment_records', paymentId));
 
-        const receiptRef = doc(db, 'receipts', receiptId);
+        const receiptRef = getScopedDoc('receipts', receiptId);
         const receiptSnap = await getDoc(receiptRef);
         const receipt = receiptSnap.data() as any;
 
-        const newPaid = (receipt.amount_paid || 0) - payment.amount;
-        const isPaid = newPaid >= receipt.total_value;
-
-        const batch = writeBatch(db);
-        batch.update(receiptRef, { amount_paid: newPaid, is_paid: isPaid });
-        batch.delete(payRef);
+        batch.update(receiptRef, { 
+            amount_paid: increment(-amount),
+            is_paid: false
+        });
 
         if (receipt.accounted ?? true) {
-            const transQuery = query(collection(db, 'transactions'), 
-                where('related_id', '==', receiptId), 
-                where('amount', '==', payment.amount), 
-                where('date', '==', payment.date));
+            const transQuery = query(getScopedCollection('transactions'), 
+                where('related_id', '==', receiptId),
+                where('type', '==', 'payment'),
+                where('amount', '==', amount)
+            );
             const transSnap = await getDocs(transQuery);
             transSnap.forEach(d => batch.delete(d.ref));
         }
 
         await batch.commit();
-        
-        if ((receipt.accounted ?? true) && receipt.bank_account_id) {
-            await bankAccountService.syncBalance(receipt.bank_account_id, -payment.amount);
+
+        if ((receipt.accounted ?? true) && (sanitizeBankAccountId(bankAccountId) || receipt.bank_account_id)) {
+            await bankAccountService.syncBalance(sanitizeBankAccountId(bankAccountId) || receipt.bank_account_id, -amount);
         }
     },
 
     updatePaymentInReceipt: async (receiptId: string, paymentId: string, amount: number, date: string, bankAccountId?: string): Promise<void> => {
-        const payRef = doc(db, 'payment_records', paymentId);
+        const payRef = getScopedDoc('payment_records', paymentId);
         const paySnap = await getDoc(payRef);
         const oldPayment = paySnap.data() as any;
 
-        const receiptRef = doc(db, 'receipts', receiptId);
+        const receiptRef = getScopedDoc('receipts', receiptId);
         const receiptSnap = await getDoc(receiptRef);
         const receipt = receiptSnap.data() as any;
 
@@ -275,7 +272,7 @@ export const receiptService = {
         batch.update(payRef, cleanFirestoreData({ amount, date }));
 
         if (accounted) {
-            const transQuery = query(collection(db, 'transactions'), 
+            const transQuery = query(getScopedCollection('transactions'), 
                 where('related_id', '==', receiptId), 
                 where('amount', '==', oldPayment.amount), 
                 where('date', '==', oldPayment.date));
@@ -288,7 +285,7 @@ export const receiptService = {
                     bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
                 }));
             } else {
-                const tRef = doc(collection(db, 'transactions'));
+                const tRef = doc(getScopedCollection('transactions'));
                 batch.set(tRef, cleanFirestoreData({
                     date: date || new Date().toISOString(),
                     type: 'payment',

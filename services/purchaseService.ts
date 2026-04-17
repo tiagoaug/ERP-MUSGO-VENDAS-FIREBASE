@@ -1,5 +1,5 @@
 // services/purchaseService.ts
-import { db } from './api';
+import { db, getScopedCollection, getScopedDoc } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc, where, writeBatch, increment } from 'firebase/firestore';
 import { Purchase, PurchaseItem, ExpenseItem, PaymentRecord, Cheque } from '../types';
 import { generateId, sanitizeBankAccountId, cleanFirestoreData } from '../lib/utils';
@@ -51,11 +51,11 @@ const buildPurchase = (row: any, id: string, items: any[], expenseItems: any[], 
 export const purchaseService = {
     getPurchases: async (): Promise<Purchase[]> => {
         const [purchasesSnap, itemsSnap, expItemsSnap, paymentsSnap, chequesSnap] = await Promise.all([
-            getDocs(query(collection(db, 'purchases'), orderBy('date', 'desc'))),
-            getDocs(collection(db, 'purchase_items')),
-            getDocs(collection(db, 'expense_items')),
-            getDocs(collection(db, 'payment_records')),
-            getDocs(collection(db, 'cheques')),
+            getDocs(query(getScopedCollection('purchases'), orderBy('date', 'desc'))),
+            getDocs(getScopedCollection('purchase_items')),
+            getDocs(getScopedCollection('expense_items')),
+            getDocs(getScopedCollection('payment_records')),
+            getDocs(getScopedCollection('cheques')),
         ]);
 
         const items = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -68,7 +68,7 @@ export const purchaseService = {
 
     createPurchase: async (purchase: Purchase): Promise<Purchase> => {
         const batch = writeBatch(db);
-        const purchaseRef = doc(collection(db, 'purchases'));
+        const purchaseRef = doc(getScopedCollection('purchases'));
         const purchaseId = purchaseRef.id;
 
         batch.set(purchaseRef, cleanFirestoreData({
@@ -89,7 +89,7 @@ export const purchaseService = {
 
         if (purchase.items?.length) {
             purchase.items.forEach(i => {
-                const iRef = doc(collection(db, 'purchase_items'));
+                const iRef = doc(getScopedCollection('purchase_items'));
                 batch.set(iRef, cleanFirestoreData({
                     purchase_id: purchaseId,
                     product_id: i.productId || null,
@@ -106,7 +106,7 @@ export const purchaseService = {
 
         if (purchase.expenseItems?.length) {
             purchase.expenseItems.forEach(e => {
-                const eRef = doc(collection(db, 'expense_items'));
+                const eRef = doc(getScopedCollection('expense_items'));
                 batch.set(eRef, cleanFirestoreData({
                     purchase_id: purchaseId,
                     description: e.description || '',
@@ -118,7 +118,7 @@ export const purchaseService = {
 
         if (purchase.cheques?.length) {
             purchase.cheques.forEach(c => {
-                const cRef = doc(collection(db, 'cheques'));
+                const cRef = doc(getScopedCollection('cheques'));
                 batch.set(cRef, cleanFirestoreData({
                     purchase_id: purchaseId,
                     supplier_id: purchase.supplierId || null,
@@ -132,7 +132,7 @@ export const purchaseService = {
         }
 
         if (purchase.isPaid && (purchase.accounted ?? true)) {
-            const tRef = doc(collection(db, 'transactions'));
+            const tRef = doc(getScopedCollection('transactions'));
             batch.set(tRef, cleanFirestoreData({
                 date: purchase.date || new Date().toISOString(), 
                 type: 'expense_payment',
@@ -158,7 +158,7 @@ export const purchaseService = {
         if (purchase.type === 'inventory' && purchase.items?.length) {
             for (const item of purchase.items) {
                 if (item.isWholesale && item.distributionId) {
-                    const wsQuery = query(collection(db, 'wholesale_stock_items'), 
+                    const wsQuery = query(getScopedCollection('wholesale_stock_items'), 
                         where('distribution_id', '==', item.distributionId), 
                         where('color_id', '==', item.colorId || null));
                     const wsSnap = await getDocs(wsQuery);
@@ -170,10 +170,10 @@ export const purchaseService = {
                             cost_price_per_box: item.costPrice
                         });
                     } else {
-                        const distDoc = await getDoc(doc(db, 'grid_distributions', item.distributionId));
+                        const distDoc = await getDoc(getScopedDoc('grid_distributions', item.distributionId));
                         const gridIdFromDist = distDoc.exists() ? distDoc.data().grid_id : null;
 
-                        await addDoc(collection(db, 'wholesale_stock_items'), cleanFirestoreData({
+                        await addDoc(getScopedCollection('wholesale_stock_items'), cleanFirestoreData({
                             product_id: item.productId,
                             color_id: item.colorId || null,
                             grid_id: gridIdFromDist,
@@ -185,13 +185,13 @@ export const purchaseService = {
                     }
 
                     // Preço unitário sync
-                    const distSnap = await getDoc(doc(db, 'grid_distributions', item.distributionId));
+                    const distSnap = await getDoc(getScopedDoc('grid_distributions', item.distributionId));
                     if (distSnap.exists()) {
                         const gridDist = distSnap.data();
                         const pairsCount = Object.values(gridDist.quantities || {}).reduce((a: any, b: any) => Number(a) + Number(b), 0) as number;
                         if (pairsCount > 0) {
                             const unitPrice = item.costPrice / pairsCount;
-                            const varsQuery = query(collection(db, 'variations'), 
+                            const varsQuery = query(getScopedCollection('variations'), 
                                 where('product_id', '==', item.productId), 
                                 where('color_id', '==', item.colorId || null));
                             const varsSnap = await getDocs(varsQuery);
@@ -201,7 +201,7 @@ export const purchaseService = {
                         }
                     }
                 } else if (item.variationId) {
-                    await updateDoc(doc(db, 'variations', item.variationId), {
+                    await updateDoc(getScopedDoc('variations', item.variationId), {
                         stock: increment(item.quantity),
                         cost_price: item.costPrice
                     });
@@ -213,7 +213,10 @@ export const purchaseService = {
     },
 
     updatePurchase: async (purchase: Purchase): Promise<Purchase> => {
-        await updateDoc(doc(db, 'purchases', purchase.id), cleanFirestoreData({
+        const batch = writeBatch(db);
+        const purchaseRef = getScopedDoc('purchases', purchase.id);
+        
+        batch.update(purchaseRef, cleanFirestoreData({
             purchase_number: purchase.purchaseNumber,
             type: purchase.type,
             is_wholesale: purchase.isWholesale,
@@ -228,13 +231,12 @@ export const purchaseService = {
         }));
 
         if (purchase.type === 'general') {
-            const expSnap = await getDocs(query(collection(db, 'expense_items'), where('purchase_id', '==', purchase.id)));
-            const batch = writeBatch(db);
+            const expSnap = await getDocs(query(getScopedCollection('expense_items'), where('purchase_id', '==', purchase.id)));
             expSnap.forEach(d => batch.delete(d.ref));
             
             if (purchase.expenseItems?.length) {
                 purchase.expenseItems.forEach(e => {
-                    const eRef = doc(collection(db, 'expense_items'));
+                    const eRef = doc(getScopedCollection('expense_items'));
                     batch.set(eRef, cleanFirestoreData({
                         purchase_id: purchase.id,
                         description: e.description || '',
@@ -242,39 +244,38 @@ export const purchaseService = {
                     }));
                 });
             }
-            await batch.commit();
         }
+        await batch.commit();
 
         return purchase;
     },
 
     deletePurchase: async (id: string): Promise<void> => {
-        const pSnap = await getDoc(doc(db, 'purchases', id));
-        const pData = pSnap.data();
-        
         const batch = writeBatch(db);
         
-        const expSnap = await getDocs(query(collection(db, 'expense_items'), where('purchase_id', '==', id)));
+        batch.delete(getScopedDoc('purchases', id));
+        
+        const expSnap = await getDocs(query(getScopedCollection('expense_items'), where('purchase_id', '==', id)));
         expSnap.forEach(d => batch.delete(d.ref));
 
-        const itemSnap = await getDocs(query(collection(db, 'purchase_items'), where('purchase_id', '==', id)));
+        const itemSnap = await getDocs(query(getScopedCollection('purchase_items'), where('purchase_id', '==', id)));
         itemSnap.forEach(d => batch.delete(d.ref));
 
-        const paySnap = await getDocs(query(collection(db, 'payment_records'), where('purchase_id', '==', id)));
+        const paySnap = await getDocs(query(getScopedCollection('payment_records'), where('purchase_id', '==', id)));
         paySnap.forEach(d => batch.delete(d.ref));
 
-        const transSnap = await getDocs(query(collection(db, 'transactions'), where('related_id', '==', id)));
+        const transSnap = await getDocs(query(getScopedCollection('transactions'), where('related_id', '==', id)));
         transSnap.forEach(d => batch.delete(d.ref));
 
         // Note: No native 'ILike' in Firestore, assuming search by number or ID is enough
         // If needed, we'd have to search and filter in memory or use a search index.
         
-        batch.delete(doc(db, 'purchases', id));
+        batch.delete(getScopedDoc('purchases', id));
         await batch.commit();
     },
 
     addPaymentToPurchase: async (purchaseId: string, amount: number, date: string, bankAccountId?: string): Promise<void> => {
-        const pDoc = await getDoc(doc(db, 'purchases', purchaseId));
+        const pDoc = await getDoc(getScopedDoc('purchases', purchaseId));
         if (!pDoc.exists()) throw new Error('Purchase not found');
         const purchase = pDoc.data();
 
@@ -283,9 +284,9 @@ export const purchaseService = {
         const newPaid = (purchase.amount_paid || 0) + amount;
         const isPaid = newPaid >= purchase.total_value;
 
-        await updateDoc(doc(db, 'purchases', purchaseId), cleanFirestoreData({ amount_paid: newPaid, is_paid: isPaid }));
+        await updateDoc(getScopedDoc('purchases', purchaseId), cleanFirestoreData({ amount_paid: newPaid, is_paid: isPaid }));
 
-        await addDoc(collection(db, 'payment_records'), cleanFirestoreData({
+        await addDoc(getScopedCollection('payment_records'), cleanFirestoreData({
             purchase_id: purchaseId,
             date,
             amount,
@@ -293,7 +294,7 @@ export const purchaseService = {
         }));
 
         if (accounted) {
-            await addDoc(collection(db, 'transactions'), cleanFirestoreData({
+            await addDoc(getScopedCollection('transactions'), cleanFirestoreData({
                 date,
                 type: 'expense_payment',
                 amount: -amount,
@@ -309,22 +310,22 @@ export const purchaseService = {
     },
 
     deletePaymentFromPurchase: async (purchaseId: string, paymentId: string): Promise<void> => {
-        const paySnap = await getDoc(doc(db, 'payment_records', paymentId));
+        const paySnap = await getDoc(getScopedDoc('payment_records', paymentId));
         if (!paySnap.exists()) throw new Error('Payment not found');
         const payment = paySnap.data();
 
-        const pDoc = await getDoc(doc(db, 'purchases', purchaseId));
+        const pDoc = await getDoc(getScopedDoc('purchases', purchaseId));
         if (!pDoc.exists()) throw new Error('Purchase not found');
         const purchase = pDoc.data();
 
         const newAmountPaid = (purchase.amount_paid || 0) - payment.amount;
         const isPaid = newAmountPaid >= purchase.total_value;
 
-        await updateDoc(doc(db, 'purchases', purchaseId), { amount_paid: newAmountPaid, is_paid: isPaid });
+        await updateDoc(getScopedDoc('purchases', purchaseId), { amount_paid: newAmountPaid, is_paid: isPaid });
         await deleteDoc(paySnap.ref);
 
         if (purchase.accounted ?? true) {
-            const transQuery = query(collection(db, 'transactions'), 
+            const transQuery = query(getScopedCollection('transactions'), 
                 where('related_id', '==', purchaseId), 
                 where('amount', '==', -payment.amount), 
                 where('date', '==', payment.date));
@@ -339,11 +340,12 @@ export const purchaseService = {
     },
 
     updatePaymentInPurchase: async (purchaseId: string, paymentId: string, newAmount: number, newDate: string, bankAccountId?: string): Promise<void> => {
-        const paySnap = await getDoc(doc(db, 'payment_records', paymentId));
+        const payRef = getScopedDoc('payment_records', paymentId);
+        const paySnap = await getDoc(payRef);
         if (!paySnap.exists()) throw new Error('Payment not found');
         const payment = paySnap.data();
 
-        const pDoc = await getDoc(doc(db, 'purchases', purchaseId));
+        const pDoc = await getDoc(getScopedDoc('purchases', purchaseId));
         if (!pDoc.exists()) throw new Error('Purchase not found');
         const purchase = pDoc.data();
 
@@ -353,11 +355,11 @@ export const purchaseService = {
         const newAmountPaid = (purchase.amount_paid || 0) + diff;
         const isPaid = newAmountPaid >= purchase.total_value;
 
-        await updateDoc(doc(db, 'purchases', purchaseId), cleanFirestoreData({ amount_paid: newAmountPaid, is_paid: isPaid }));
-        await updateDoc(doc(db, 'payment_records', paymentId), cleanFirestoreData({ amount: newAmount, date: newDate }));
+        await updateDoc(getScopedDoc('purchases', purchaseId), cleanFirestoreData({ amount_paid: newAmountPaid, is_paid: isPaid }));
+        await updateDoc(payRef, cleanFirestoreData({ amount: newAmount, date: newDate }));
 
         if (accounted) {
-            const transQuery = query(collection(db, 'transactions'), 
+            const transQuery = query(getScopedCollection('transactions'), 
                 where('related_id', '==', purchaseId), 
                 where('amount', '==', -payment.amount), 
                 where('date', '==', payment.date));
@@ -370,7 +372,7 @@ export const purchaseService = {
                     bank_account_id: sanitizeBankAccountId(finalBankAccountId) || null
                 }));
             } else {
-                await addDoc(collection(db, 'transactions'), cleanFirestoreData({
+                await addDoc(getScopedCollection('transactions'), cleanFirestoreData({
                     date: newDate,
                     type: 'expense_payment',
                     amount: -newAmount,

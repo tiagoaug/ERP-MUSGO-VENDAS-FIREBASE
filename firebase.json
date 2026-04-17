@@ -21,6 +21,7 @@
   },
   "auth": {
     "providers": {
+      "emailPassword": true,
       "googleSignIn": {
         "oAuthBrandDisplayName": "Calculadora Preço PRO",
         "supportEmail": "tiagoaugusto.ns@gmail.com"

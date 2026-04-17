@@ -1,5 +1,5 @@
 // services/customerService.ts
-import { db } from './api';
+import { db, getScopedCollection, getScopedDoc } from './api';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
 import { Customer } from '../types';
 import { cleanFirestoreData } from '../lib/utils';
@@ -14,7 +14,7 @@ const fromRow = (id: string, c: any): Customer => ({
 
 export const customerService = {
     getCustomers: async (): Promise<Customer[]> => {
-        const q = query(collection(db, 'customers'), orderBy('name'));
+        const q = query(getScopedCollection('customers'), orderBy('name'));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => fromRow(d.id, d.data()));
     },
@@ -28,26 +28,19 @@ export const customerService = {
         };
 
         if (customer.id && customer.id.trim()) {
-            await setDoc(doc(db, 'customers', customer.id), cleanFirestoreData(data));
+            await setDoc(getScopedDoc('customers', customer.id), cleanFirestoreData(data));
             return { ...customer };
         } else {
-            const docRef = await addDoc(collection(db, 'customers'), cleanFirestoreData(data));
+            const docRef = await addDoc(getScopedCollection('customers'), cleanFirestoreData(data));
             return fromRow(docRef.id, data);
         }
     },
 
-    updateCustomer: async (customer: Customer): Promise<Customer> => {
-        const data = {
-            name: customer.name,
-            phone: customer.phone,
-            balance: customer.balance ?? 0,
-            address: customer.address,
-        };
-        await updateDoc(doc(db, 'customers', customer.id), cleanFirestoreData(data));
-        return customer;
+    updateCustomer: async (customer: Customer): Promise<void> => {
+        await updateDoc(getScopedDoc('customers', customer.id), cleanFirestoreData(customer));
     },
 
     deleteCustomer: async (id: string): Promise<void> => {
-        await deleteDoc(doc(db, 'customers', id));
+        await deleteDoc(getScopedDoc('customers', id));
     },
 };

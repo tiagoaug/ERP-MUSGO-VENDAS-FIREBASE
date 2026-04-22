@@ -391,7 +391,7 @@ const App: React.FC = () => {
             { view: 'clientes' as ViewType, label: 'B.CLIENTES', color: 'bg-red-600', icon: <AddressBook size={20} weight="duotone" /> },
             { view: 'fornecedores' as ViewType, label: 'B.FORN', color: 'bg-emerald-600', icon: <AddressBook size={20} weight="duotone" /> },
             { view: 'relacionamento' as ViewType, label: 'Histórico de Clientes', color: 'bg-rose-600', icon: <Handshake size={20} weight="duotone" /> },
-            { view: 'relacionamento_fornecedores' as ViewType, label: 'Histórico de Compras', color: 'bg-emerald-700', icon: <Handshake size={20} weight="duotone" /> },
+            { view: 'relacionamento_fornecedores' as ViewType, label: 'Histórico de Fornecedores', color: 'bg-emerald-700', icon: <Handshake size={20} weight="duotone" /> },
             { view: 'vendas' as ViewType, label: 'Histórico', color: 'bg-cyan-700', icon: <ClockCounterClockwise size={20} weight="duotone" /> },
             { view: 'relatorios' as ViewType, label: 'Relatórios e Backup', color: 'bg-cyan-600', icon: <ChartPie size={20} weight="duotone" /> },
             { view: 'agenda' as ViewType, label: 'Agenda', color: 'bg-violet-600', icon: <CalendarBlank size={20} weight="duotone" /> },

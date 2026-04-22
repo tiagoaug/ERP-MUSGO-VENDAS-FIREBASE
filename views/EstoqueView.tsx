@@ -142,7 +142,7 @@ export const EstoqueView = ({ products, colors, showMiniatures, onUpdateProduct,
                 {onRecalculate && (
                     <button
                         onClick={() => {
-                            if (window.confirm('Deseja recalcular o estoque global com base no histórico de compras e vendas? Isso sincronizará os saldos reais.')) {
+                            if (window.confirm('Deseja recalcular o estoque global com base no histórico de fornecedores e vendas? Isso sincronizará os saldos reais.')) {
                                 onRecalculate();
                             }
                         }}

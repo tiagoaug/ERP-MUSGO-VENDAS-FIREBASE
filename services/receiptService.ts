@@ -180,7 +180,7 @@ export const receiptService = {
         }
     },
 
-    addPayment: async (receiptId: string, amount: number, date: string, note: string, bankAccountId?: string): Promise<void> => {
+    addPaymentToReceipt: async (receiptId: string, amount: number, date: string, note?: string, bankAccountId?: string): Promise<void> => {
         const batch = writeBatch(db);
         const payRef = doc(getScopedCollection('payment_records'));
         const receiptRef = getScopedDoc('receipts', receiptId);
@@ -222,9 +222,14 @@ export const receiptService = {
         }
     },
 
-    removePayment: async (paymentId: string, amount: number, receiptId: string, bankAccountId?: string): Promise<void> => {
+    deletePaymentFromReceipt: async (receiptId: string, paymentId: string): Promise<void> => {
         const batch = writeBatch(db);
-        batch.delete(getScopedDoc('payment_records', paymentId));
+        const payRef = getScopedDoc('payment_records', paymentId);
+        const paySnap = await getDoc(payRef);
+        const payment = paySnap.data() as any;
+        const amount = payment.amount;
+
+        batch.delete(payRef);
 
         const receiptRef = getScopedDoc('receipts', receiptId);
         const receiptSnap = await getDoc(receiptRef);
@@ -247,8 +252,8 @@ export const receiptService = {
 
         await batch.commit();
 
-        if ((receipt.accounted ?? true) && (sanitizeBankAccountId(bankAccountId) || receipt.bank_account_id)) {
-            await bankAccountService.syncBalance(sanitizeBankAccountId(bankAccountId) || receipt.bank_account_id, -amount);
+        if ((receipt.accounted ?? true) && receipt.bank_account_id) {
+            await bankAccountService.syncBalance(receipt.bank_account_id, -amount);
         }
     },
 

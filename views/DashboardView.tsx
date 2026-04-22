@@ -745,7 +745,7 @@ export const DashboardView = ({
             <StatBox label="Caixa Atual" value={stats.cash} icon={<CurrencyDollar size={22} weight="duotone" />} color="blue" />
             <StatBox label="Estoque" value={stats.stockCost} icon={<Package size={22} weight="duotone" />} color="indigo" onClick={() => setView('estoque')} />
             <StatBox label="Total em Aberto (Vendas + Entradas)" value={stats.receivable} icon={<ArrowSquareUpRight size={22} weight="duotone" />} color="emerald" onClick={() => onNavigateToSaleOrReceipt ? onNavigateToSaleOrReceipt('', '', 'sale') : setView('relacionamento')} />
-            <StatBox label="Histórico de Compras" value={stats.payable} icon={<ArrowSquareDownLeft size={22} weight="duotone" />} color="rose" onClick={() => onNavigateToPurchase ? onNavigateToPurchase('', '') : setView('relacionamento_fornecedores')} />
+            <StatBox label="Histórico de Fornecedores" value={stats.payable} icon={<ArrowSquareDownLeft size={22} weight="duotone" />} color="rose" onClick={() => onNavigateToPurchase ? onNavigateToPurchase('', '') : setView('relacionamento_fornecedores')} />
           </div>
 
           {/* Alerta de Pedidos Pendentes */}

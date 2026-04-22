@@ -103,7 +103,7 @@ export const FornecedoresView = ({ suppliers, purchases, sales, customers, onAdd
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-xl font-black uppercase tracking-tight">Central de Fornecedores</h2>
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">Gestão de Parceiros & Histórico de Compras</p>
+          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">Gestão de Parceiros & Histórico de Fornecedores</p>
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">

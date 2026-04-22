@@ -252,7 +252,7 @@ export const RelacionamentoComprasView = ({
                             <Handshake size={20} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black uppercase dark:text-white leading-none tracking-tight">Histórico de Compras</h2>
+                            <h2 className="text-xl font-black uppercase dark:text-white leading-none tracking-tight">Histórico de Fornecedores</h2>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Central de Finanças e Pagamentos</p>
                         </div>
                     </div>

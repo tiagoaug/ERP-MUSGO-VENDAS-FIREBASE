@@ -1,21 +1,19 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Regras para migração: permite que qualquer usuário autenticado leia as coleções globais
-    // para que possam migrar seus dados para o seu próprio escopo.
-    match /{collectionName}/{docId} {
-      allow read: if request.auth != null && 
-        !(collectionName in ['users']); // Protege a coleção de usuários
-    }
-
     // Regras de Produção: Isolamento total por UID
+    // Cada usuário só pode ler e escrever em sua própria pasta e subcoleções
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Configurações e metadados do usuário
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Bloqueia qualquer outro acesso global (Não há coleções compartilhadas)
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

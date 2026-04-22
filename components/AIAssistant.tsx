@@ -91,7 +91,7 @@ export const AIAssistant = ({ currentView, isOpen, onClose }: AIAssistantProps) 
       tips: ["Recebimentos manuais ajudam no controle de entradas avulsas"]
     },
     clientes: {
-      steps: ["Cadastre novos clientes", "Veja o histórico de compras", "Importe contatos"],
+      steps: ["Cadastre novos clientes", "Veja o histórico de fornecedores", "Importe contatos"],
       tips: ["Clientes bem cadastrados aparecem melhor nos relatórios"]
     },
     fornecedores: {

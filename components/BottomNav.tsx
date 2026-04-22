@@ -34,7 +34,7 @@ const ALL_NAV_ITEMS: NavItemConfig[] = [
     { id: 'clientes', icon: AddressBook, label: 'B.CLIENTES', colorClass: { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30', dot: 'bg-red-600 dark:bg-red-400' } },
     { id: 'fornecedores', icon: AddressBook, label: 'B.FORN', colorClass: { text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30', dot: 'bg-emerald-600 dark:bg-emerald-400' } },
     { id: 'relacionamento', icon: Handshake, label: 'Hist. Cli.', colorClass: { text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/30', dot: 'bg-rose-600 dark:bg-rose-400' } },
-    { id: 'relacionamento_fornecedores', icon: Handshake, label: 'Hist. Com.', colorClass: { text: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-900/30', dot: 'bg-teal-600 dark:bg-teal-400' } },
+    { id: 'relacionamento_fornecedores', icon: Handshake, label: 'Hist. Forn.', colorClass: { text: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-900/30', dot: 'bg-teal-600 dark:bg-teal-400' } },
     { id: 'relatorios', icon: ChartPie, label: 'Relat.', colorClass: { text: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30', dot: 'bg-purple-600 dark:bg-purple-400' } },
     { id: 'agenda', icon: CalendarBlank, label: 'Agenda', colorClass: { text: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-900/30', dot: 'bg-violet-600 dark:bg-violet-400' } },
     { id: 'backup', icon: ShieldCheck, label: 'Backup', colorClass: { text: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30', dot: 'bg-cyan-600 dark:bg-cyan-400' } }
